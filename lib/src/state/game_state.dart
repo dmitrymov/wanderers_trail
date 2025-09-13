@@ -75,12 +75,28 @@ class GameState extends ChangeNotifier {
     _persist();
   }
 
+  // Try to consume stamina; returns false if not enough.
+  bool tryConsumeStamina(int amount) {
+    if (profile.stamina < amount) return false;
+    final newStamina = max(0, profile.stamina - amount);
+    _profile = profile.copyWith(stamina: newStamina);
+    notifyListeners();
+    _persist();
+    return true;
+  }
+
   void updateHighScore(int score) {
     if (score > profile.highScore) {
       _profile = profile.copyWith(highScore: score);
       notifyListeners();
       _persist();
     }
+  }
+
+  void loseHealth(int amount) {
+    _profile = profile.copyWith(health: max(0, profile.health - amount));
+    notifyListeners();
+    _persist();
   }
 
   // Equipment
