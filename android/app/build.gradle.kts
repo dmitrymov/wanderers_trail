@@ -24,7 +24,8 @@ android {
         applicationId = "com.example.wanderers_trail"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // Bump minSdk to satisfy cloud_firestore requirement
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
