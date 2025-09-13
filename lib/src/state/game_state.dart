@@ -6,6 +6,7 @@ import '../data/models/item.dart';
 import '../data/models/pet.dart';
 import '../data/models/player_profile.dart';
 import '../data/repositories/game_repository.dart';
+import '../core/stats.dart';
 import 'package:flutter/foundation.dart';
 
 class GameState extends ChangeNotifier {
@@ -17,6 +18,10 @@ class GameState extends ChangeNotifier {
 
   static const _uuid = Uuid();
   Timer? _regenTimer;
+
+  // Cached stats summary (recomputed when equipped item IDs change)
+  StatsSummary? _statsCache;
+  String? _cacheWeaponId, _cacheArmorId, _cacheRingId, _cacheBootsId;
 
   static const PlayerProfile _placeholder = PlayerProfile(
     userId: 'local',
@@ -115,6 +120,7 @@ class GameState extends ChangeNotifier {
         _profile = profile.copyWith(boots: item);
         break;
     }
+    _invalidateStatsCache();
     notifyListeners();
     _persist();
   }
@@ -135,6 +141,36 @@ class GameState extends ChangeNotifier {
     } catch (_) {
       // ignore for now
     }
+  }
+
+  void _invalidateStatsCache() {
+    _statsCache = null;
+    _cacheWeaponId = null;
+    _cacheArmorId = null;
+    _cacheRingId = null;
+    _cacheBootsId = null;
+  }
+
+  StatsSummary get statsSummary {
+    final w = profile.weapon?.id;
+    final a = profile.armor?.id;
+    final r = profile.ring?.id;
+    final b = profile.boots?.id;
+    final dirty = _statsCache == null ||
+        w != _cacheWeaponId || a != _cacheArmorId || r != _cacheRingId || b != _cacheBootsId;
+    if (dirty) {
+      _statsCache = StatsSummary.fromItems(
+        weapon: profile.weapon,
+        armor: profile.armor,
+        ring: profile.ring,
+        boots: profile.boots,
+      );
+      _cacheWeaponId = w;
+      _cacheArmorId = a;
+      _cacheRingId = r;
+      _cacheBootsId = b;
+    }
+    return _statsCache!;
   }
 
   @override

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../state/game_state.dart';
+import '../../data/models/item.dart';
 import '../widgets/item_drop_popup.dart';
 
 class BattleTab extends StatelessWidget {
@@ -106,55 +107,103 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
       }
       final now = DateTime.now();
       if (_nextPlayerHit != null && now.isAfter(_nextPlayerHit!)) {
-        final damage = _calcPlayerDamage(gs);
-        // Spawn damage float over monster
-        final fx = 0.5 + (_rnd.nextDouble() - 0.5) * 0.18;
-        _floats.add(_DamageFloat(
-          text: '-$damage',
-          color: Colors.greenAccent,
-          start: now,
-          duration: const Duration(milliseconds: 800),
-          xFrac: fx,
-          yFrac: 0.24,
-          rise: 36,
-        ));
-        setState(() {
-          _monster = _monster!.hit(damage);
-        });
+        // Accuracy check
+        final hitChance = (0.8 + _sumStat(gs, ItemStatType.accuracy)).clamp(0.1, 0.98);
+        final hit = _rnd.nextDouble() < hitChance;
         _nextPlayerHit = now.add(Duration(milliseconds: _playerIntervalMs));
-        if (_monster!.hp <= 0) {
-          final drop = gs.maybeDrop(runScore: _step);
-          setState(() => _monster = null);
-          _stopCombat();
-          if (drop != null && mounted) {
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (_) => ItemDropPopup(item: drop, onEquip: () => gs.equip(drop)),
-            );
+        if (hit) {
+          var damage = _calcPlayerDamage(gs);
+          // Crit roll
+          final critChance = _sumStat(gs, ItemStatType.critChance).clamp(0.0, 0.95);
+          final critMult = 1.0 + _sumStat(gs, ItemStatType.critDamage);
+          final isCrit = _rnd.nextDouble() < critChance;
+          if (isCrit) {
+            damage = max(1, (damage * critMult).round());
           }
-          return;
+          // Spawn damage float over monster
+          final fx = 0.5 + (_rnd.nextDouble() - 0.5) * 0.18;
+          _floats.add(_DamageFloat(
+            text: isCrit ? '-$damage!' : '-$damage',
+            color: isCrit ? Colors.yellowAccent : Colors.greenAccent,
+            start: now,
+            duration: const Duration(milliseconds: 800),
+            xFrac: fx,
+            yFrac: 0.24,
+            rise: isCrit ? 44 : 36,
+          ));
+          // Reduce by monster defense
+          final monDefense = _monster!.defense;
+          final finalDamage = _reduceByDefense(damage, monDefense);
+          setState(() {
+            _monster = _monster!.hit(finalDamage);
+          });
+          if (_monster!.hp <= 0) {
+            final drop = gs.maybeDrop(runScore: _step);
+            setState(() => _monster = null);
+            _stopCombat();
+            if (drop != null && mounted) {
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => ItemDropPopup(item: drop, onEquip: () => gs.equip(drop)),
+              );
+            }
+            return;
+          }
+        } else {
+          // Miss float
+          final fx = 0.5 + (_rnd.nextDouble() - 0.5) * 0.18;
+          _floats.add(_DamageFloat(
+            text: 'miss',
+            color: Colors.white,
+            start: now,
+            duration: const Duration(milliseconds: 600),
+            xFrac: fx,
+            yFrac: 0.24,
+            rise: 26,
+          ));
         }
       }
       if (_nextMonsterHit != null && now.isAfter(_nextMonsterHit!)) {
-        final dmg = 2 + (_step ~/ 5) + _rnd.nextInt(3);
-        // Spawn damage float near player HUD
-        final fx = 0.15 + (_rnd.nextDouble() - 0.5) * 0.12;
-        _floats.add(_DamageFloat(
-          text: '-$dmg',
-          color: Colors.redAccent,
-          start: now,
-          duration: const Duration(milliseconds: 800),
-          xFrac: fx,
-          yFrac: 0.08,
-          rise: 30,
-        ));
-        gs.loseHealth(dmg);
+        // Enemy accuracy vs player evasion
+        final playerEvasion = _sumStat(gs, ItemStatType.evasion);
+        final accBase = _monster!.accuracy; // 0..1
+        final hitChance = (accBase - playerEvasion + 0.75).clamp(0.05, 0.98);
+        final hit = _rnd.nextDouble() < hitChance;
         _nextMonsterHit = now.add(Duration(milliseconds: _monsterIntervalMs));
-        if (gs.profile.health <= 0) {
-          _stopCombat();
-          _handleDefeat();
-          return;
+        if (hit) {
+          final raw = 2 + (_step ~/ 5) + _rnd.nextInt(3);
+          final defense = _calcPlayerDefense(gs);
+          final dmg = _reduceByDefense(raw, defense);
+          // Spawn damage float near player HUD
+          final fx = 0.15 + (_rnd.nextDouble() - 0.5) * 0.12;
+          _floats.add(_DamageFloat(
+            text: '-$dmg',
+            color: Colors.redAccent,
+            start: now,
+            duration: const Duration(milliseconds: 800),
+            xFrac: fx,
+            yFrac: 0.08,
+            rise: 30,
+          ));
+          gs.loseHealth(dmg);
+          if (gs.profile.health <= 0) {
+            _stopCombat();
+            _handleDefeat();
+            return;
+          }
+        } else {
+          // Player evaded
+          final fx = 0.15 + (_rnd.nextDouble() - 0.5) * 0.12;
+          _floats.add(_DamageFloat(
+            text: 'evade',
+            color: Colors.white,
+            start: now,
+            duration: const Duration(milliseconds: 600),
+            xFrac: fx,
+            yFrac: 0.08,
+            rise: 20,
+          ));
         }
       }
       // Cleanup expired floats
@@ -175,14 +224,44 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     const base = 1000;
     final weapon = gs.profile.weapon;
     final weaponBonus = weapon == null ? 0 : (weapon.power * 20);
-    return (base - weaponBonus).clamp(400, 2000);
+    // Agility speeds up attacks: -10ms per agility point
+    final agility = _sumStat(gs, ItemStatType.agility);
+    final agilityBonus = (agility * 10).round();
+    return (base - weaponBonus - agilityBonus).clamp(400, 2000);
   }
 
   int _calcPlayerDamage(GameState gs) {
     const base = 5;
     final weapon = gs.profile.weapon;
     final bonus = weapon?.power ?? 0;
-    return base + bonus;
+    final extraAttack = _sumStat(gs, ItemStatType.attack).round();
+    return base + bonus + extraAttack;
+  }
+
+  // Aggregate a stat across equipped items
+  double _sumStat(GameState gs, ItemStatType t) {
+    final p = gs.profile;
+    double acc = 0;
+    for (final it in [p.weapon, p.armor, p.ring, p.boots]) {
+      if (it == null) continue;
+      final v = it.stats[t];
+      if (v != null) acc += v;
+    }
+    return acc;
+  }
+
+  int _calcPlayerDefense(GameState gs) {
+    final p = gs.profile;
+    int base = (p.armor?.power ?? 0) + (p.boots?.power ?? 0);
+    final extra = _sumStat(gs, ItemStatType.defense).round();
+    return base + extra;
+  }
+
+  int _reduceByDefense(int raw, int defense) {
+    if (defense <= 0) return max(1, raw);
+    final dr = defense / (defense + 50.0); // diminishing returns
+    final reduced = (raw * (1 - dr)).round();
+    return max(1, reduced);
   }
 
   double _progressTo(DateTime? next, int intervalMs) {
@@ -366,21 +445,36 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
 }
 
 class _InventoryBar extends StatelessWidget {
+  Color _rarityColor(ItemRarity? r) {
+    switch (r) {
+      case ItemRarity.uncommon:
+        return Colors.green;
+      case ItemRarity.rare:
+        return Colors.blue;
+      case ItemRarity.legendary:
+        return const Color(0xFFFFD700);
+      case ItemRarity.mystic:
+        return Colors.redAccent;
+      case ItemRarity.normal:
+      default:
+        return Colors.white24;
+    }
+  }
   @override
   Widget build(BuildContext context) {
     final p = context.watch<GameState>().profile;
-    Widget cell(String label, String? value) => Expanded(
+    Widget cell(String label, Item? item) => Expanded(
           child: Container(
             height: 52,
             decoration: BoxDecoration(
               color: Colors.black.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.white24),
+              border: Border.all(color: _rarityColor(item?.rarity)),
             ),
             alignment: Alignment.center,
             child: Text(
-              value == null ? label : '$label: $value',
-              style: const TextStyle(color: Colors.white, fontSize: 12),
+              item == null ? label : '$label: ${item.name}',
+              style: TextStyle(color: item == null ? Colors.white : _rarityColor(item.rarity)),
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -389,13 +483,13 @@ class _InventoryBar extends StatelessWidget {
         );
     return Row(
       children: [
-        cell('Weapon', p.weapon?.name),
+        cell('Weapon', p.weapon),
         const SizedBox(width: 8),
-        cell('Armor', p.armor?.name),
+        cell('Armor', p.armor),
         const SizedBox(width: 8),
-        cell('Ring', p.ring?.name),
+        cell('Ring', p.ring),
         const SizedBox(width: 8),
-        cell('Boots', p.boots?.name),
+        cell('Boots', p.boots),
       ],
     );
   }
@@ -494,9 +588,25 @@ class Monster {
   final int hp;
   final int maxHp;
   final int attackMs; // attack interval in milliseconds
-  const Monster({required this.name, required this.hp, required this.maxHp, required this.attackMs});
+  final int defense; // reduces damage taken
+  final double accuracy; // 0..1 base accuracy
+  const Monster({
+    required this.name,
+    required this.hp,
+    required this.maxHp,
+    required this.attackMs,
+    required this.defense,
+    required this.accuracy,
+  });
 
-  Monster hit(int damage) => Monster(name: name, hp: (hp - damage).clamp(0, maxHp), maxHp: maxHp, attackMs: attackMs);
+  Monster hit(int damage) => Monster(
+        name: name,
+        hp: (hp - damage).clamp(0, maxHp),
+        maxHp: maxHp,
+        attackMs: attackMs,
+        defense: defense,
+        accuracy: accuracy,
+      );
 
   static Monster randomForStep(int step, Random rnd) {
     final maxHp = 12 + (step ~/ 5);
@@ -505,8 +615,23 @@ class Monster {
     final variance = rnd.nextInt(401) - 200; // -200..+200
     final faster = (step ~/ 15) * 50; // -0, -50, -100...
     final ms = (1000 + variance - faster).clamp(500, 2000);
+
+    // Defense scales slowly
+    final defense = (2 + (step ~/ 6) + rnd.nextInt(3));
+    // Accuracy scales slightly with progress and variance
+    final accBase = 0.70 + (step * 0.004).clamp(0, 0.2);
+    final accVar = (rnd.nextDouble() - 0.5) * 0.1; // +/-0.05
+    final accuracy = (accBase + accVar).clamp(0.4, 0.95);
+
     const names = ['Slime', 'Wolf', 'Bandit', 'Spider'];
-    return Monster(name: names[rnd.nextInt(names.length)], hp: hp, maxHp: maxHp, attackMs: ms);
+    return Monster(
+      name: names[rnd.nextInt(names.length)],
+      hp: hp,
+      maxHp: maxHp,
+      attackMs: ms,
+      defense: defense,
+      accuracy: accuracy,
+    );
   }
 }
 
