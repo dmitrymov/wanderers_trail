@@ -13,12 +13,49 @@ class BattleTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final gs = context.watch<GameState>();
+    final resumeStep = (gs.profile.highScore ~/ 50) * 50;
     return Center(
       child: ElevatedButton(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const ActiveBattlePage()),
+        onPressed: () async {
+          final choice = await showDialog<_StartChoice>(
+            context: context,
+            builder: (ctx) {
+              return AlertDialog(
+                title: const Text('Start Journey'),
+                content: Text(resumeStep >= 50
+                    ? 'Start a new run from Step 0 (items reset), or resume from Step $resumeStep?'
+                    : 'Start a new run from Step 0 (items reset).'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(_StartChoice.newRun),
+                    child: const Text('New Run'),
+                  ),
+                  if (resumeStep >= 50)
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(ctx).pop(_StartChoice.resume),
+                      child: Text('Resume $resumeStep'),
+                    ),
+                ],
+              );
+            },
           );
+
+          if (choice == null) return;
+          if (choice == _StartChoice.newRun) {
+            gs.resetForNewRun();
+            // Begin at step 0
+            // ignore: use_build_context_synchronously
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ActiveBattlePage(initialStep: 0)),
+            );
+          } else {
+            gs.prepareForCheckpointRun();
+            // ignore: use_build_context_synchronously
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => ActiveBattlePage(initialStep: resumeStep)),
+            );
+          }
         },
         child: const Text('Start'),
       ),
@@ -26,8 +63,11 @@ class BattleTab extends StatelessWidget {
   }
 }
 
+enum _StartChoice { newRun, resume }
+
 class ActiveBattlePage extends StatefulWidget {
-  const ActiveBattlePage({super.key});
+  const ActiveBattlePage({super.key, this.initialStep = 0});
+  final int initialStep;
 
   @override
   State<ActiveBattlePage> createState() => _ActiveBattlePageState();
@@ -51,6 +91,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   void initState() {
     super.initState();
     _rnd = Random();
+    _step = widget.initialStep;
   }
 
   void _advance(GameState gs) {

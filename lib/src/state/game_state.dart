@@ -62,6 +62,29 @@ class GameState extends ChangeNotifier {
     _persist();
   }
 
+  void resetForNewRun() {
+    _profile = profile.copyWith(
+      health: 100,
+      stamina: 100,
+      weapon: null,
+      armor: null,
+      ring: null,
+      boots: null,
+    );
+    _invalidateStatsCache();
+    notifyListeners();
+    _persist();
+  }
+
+  void prepareForCheckpointRun() {
+    _profile = profile.copyWith(
+      health: 100,
+      stamina: 100,
+    );
+    notifyListeners();
+    _persist();
+  }
+
   void upgradeHealth() {
     _profile = profile.copyWith(health: (profile.health + 10).clamp(0, 200));
     notifyListeners();
