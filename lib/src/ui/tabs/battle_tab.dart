@@ -388,6 +388,16 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
                       _monster!.name,
                       style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                     ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: 96,
+                      height: 96,
+                      child: Image.asset(
+                        _monster!.imageAsset,
+                        fit: BoxFit.contain,
+                        errorBuilder: (c, e, s) => const Icon(Icons.pest_control, color: Colors.white54, size: 64),
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     _MonsterHpBar(current: _monster!.hp, max: _monster!.maxHp),
                     const SizedBox(height: 8),
@@ -732,6 +742,7 @@ class Monster {
   final int attackMs; // attack interval in milliseconds
   final int defense; // reduces damage taken
   final double accuracy; // 0..1 base accuracy
+  final String imageAsset; // enemy image asset path
   const Monster({
     required this.name,
     required this.hp,
@@ -739,6 +750,7 @@ class Monster {
     required this.attackMs,
     required this.defense,
     required this.accuracy,
+    required this.imageAsset,
   });
 
   Monster hit(int damage) => Monster(
@@ -748,6 +760,7 @@ class Monster {
         attackMs: attackMs,
         defense: defense,
         accuracy: accuracy,
+        imageAsset: imageAsset,
       );
 
   static Monster randomForStep(int step, Random rnd) {
@@ -766,13 +779,16 @@ class Monster {
     final accuracy = (accBase + accVar).clamp(0.4, 0.95);
 
     const names = ['Slime', 'Wolf', 'Bandit', 'Spider'];
+    final name = names[rnd.nextInt(names.length)];
+    final image = 'assets/images/enemies/' + name.toLowerCase() + '.png';
     return Monster(
-      name: names[rnd.nextInt(names.length)],
+      name: name,
       hp: hp,
       maxHp: maxHp,
       attackMs: ms,
       defense: defense,
       accuracy: accuracy,
+      imageAsset: image,
     );
   }
 }
