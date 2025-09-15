@@ -135,10 +135,7 @@ class Item {
     final stats = _rollAdditionalStats(type, rarity, level, rnd);
     final name = _rarityPrefix(rarity) + baseName + ' +' + level.toString();
 
-    String? image;
-    if (type == ItemType.weapon) {
-      image = _weaponImagePath(rarity, rnd);
-    }
+    final image = _itemImagePath(type, rarity, rnd);
 
     return Item(
       id: idGen(),
@@ -166,14 +163,59 @@ class Item {
         return '4';
     }
   }
-
+  
+  static String? _itemImagePath(ItemType type, ItemRarity rarity, Random rnd) {
+    switch (type) {
+      case ItemType.weapon:
+        return _weaponImagePath(rarity, rnd);
+      case ItemType.armor:
+        return _armorImagePath(rarity, rnd);
+      case ItemType.ring:
+        return _ringImagePath(rarity, rnd);
+      case ItemType.boots:
+        return _bootsImagePath(rarity, rnd);
+      default:
+        return null;
+    }
+  }
   // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
   static String _weaponImagePath(ItemRarity rarity, Random rnd) {
     const categories = ['dagger', 'sword', 'axe', 'mace', 'spear', 'bow', 'staff'];
     final cat = categories[rnd.nextInt(categories.length)];
     final rarityCode = _rarityDigit(rarity);
     final id = rnd.nextInt(10); // 0..9 id suffix
-    return 'assets/images/weapons/' + cat + '_' + rarityCode + id.toString() + '.png';
+    //return 'assets/images/weapons/' + cat + '_' + rarityCode + id.toString() + '.png';
+    return 'assets/images/weapons/' + "dagger" + '_' + rarityCode + "1" + '.png';
+  }
+
+    // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
+  static String _bootsImagePath(ItemRarity rarity, Random rnd) {
+    const categories = ['boots'];
+    final cat = categories[rnd.nextInt(categories.length)];
+    final rarityCode = _rarityDigit(rarity);
+    final id = rnd.nextInt(10); // 0..9 id suffix
+    //return 'assets/images/boots/' + cat + '_' + rarityCode + id.toString() + '.png';
+    return 'assets/images/boots/' + cat + '_' + rarityCode + "1" + '.png';
+  }
+
+    // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
+  static String _armorImagePath(ItemRarity rarity, Random rnd) {
+    const categories = ['armor', 'chestplate', 'robe', 'leather'];
+    final cat = categories[rnd.nextInt(categories.length)];
+    final rarityCode = _rarityDigit(rarity);
+    final id = rnd.nextInt(10); // 0..9 id suffix
+    //return 'assets/images/armor/' + cat + '_' + rarityCode + id.toString() + '.png';
+    return 'assets/images/armor/' + "armor" + '_' + rarityCode + "1" + '.png';
+  }
+
+    // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
+  static String _ringImagePath(ItemRarity rarity, Random rnd) {
+    const categories = ['ring', 'amulet', 'earring'];
+    final cat = categories[rnd.nextInt(categories.length)];
+    final rarityCode = _rarityDigit(rarity);
+    final id = rnd.nextInt(10); // 0..9 id suffix
+    //return 'assets/images/rings/' + cat + '_' + rarityCode + id.toString() + '.png';
+    return 'assets/images/rings/' + "ring" + '_' + rarityCode + "1" + '.png';
   }
 
   static ItemRarity _rollRarity(Random rnd) {

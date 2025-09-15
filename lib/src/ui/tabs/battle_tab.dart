@@ -129,6 +129,13 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
         _monster = Monster.randomForStep(_step, _rnd);
         _startCombat(gs);
       }
+      else if (_rnd.nextDouble() < 0.10) {
+        var restorePoints = 10 + (_step ~/ 10);
+        gs.loseHealth(-restorePoints);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Restored $restorePoints health!")),
+        );
+      }
     });
   }
 
@@ -183,6 +190,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
             setState(() => _monster = null);
             _stopCombat();
             if (drop != null && mounted) {
+              //item drop!
               showDialog(
                 context: context,
                 barrierDismissible: false,
@@ -600,8 +608,8 @@ Widget cell(String label, Item? item) => Expanded(
                         message: item.stats.entries.map((e) => _statLine(e.key, e.value)).join('\n'),
                         preferBelow: false,
                         child: SizedBox(
-                          width: 36,
-                          height: 36,
+                          width: 60,
+                          height: 60,
                           child: Image.asset(
                             _assetForItem(item),
                             fit: BoxFit.contain,
