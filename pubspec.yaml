@@ -68,6 +68,7 @@ flutter:
     - assets/images/items/
     - assets/images/weapons/
     - assets/images/enemies/
+    - assets/images/backgrounds/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

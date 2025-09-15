@@ -357,7 +357,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           // Background path image (using existing asset for now)
           Positioned.fill(
             child: Image.asset(
-              'assets/images/main_screen.png',
+              'assets/images/backgrounds/battle_bg.png',
               fit: BoxFit.cover,
               errorBuilder: (context, error, stack) => Container(color: Colors.black),
             ),
@@ -366,24 +366,39 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white24),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('Step: $_step', style: const TextStyle(color: Colors.white)),
                   Text('HP: ${p.health}', style: const TextStyle(color: Colors.white)),
                   Text('Stamina: ${p.stamina}', style: const TextStyle(color: Colors.white)),
                 ],
               ),
+                ),
+              ),
             ),
-          ),
           if (_monster != null)
             Align(
               alignment: Alignment.topCenter,
               child: Padding(
                 padding: const EdgeInsets.only(top: 64.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                     Text(
                       _monster!.name,
                       style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
@@ -421,6 +436,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
                       ),
                     ),
                   ],
+                  ),
                 ),
               ),
             ),
@@ -460,9 +476,16 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           // Bottom inventory + advance button
           Align(
             alignment: Alignment.bottomCenter,
-            child: SafeArea(
+child: SafeArea(
               minimum: const EdgeInsets.only(bottom: 12, left: 12, right: 12),
-              child: Column(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white24),
+                ),
+                padding: const EdgeInsets.all(12),
+                child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _InventoryBar(),
@@ -496,6 +519,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
                 ],
               ),
             ),
+          ),
           ),
         ],
       ),
