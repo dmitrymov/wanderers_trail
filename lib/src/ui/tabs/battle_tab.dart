@@ -501,27 +501,119 @@ class _InventoryBar extends StatelessWidget {
         return Colors.white24;
     }
   }
+
+  String _assetForItem(Item item) {
+    // Prefer per-item image asset if provided; otherwise fallback by type
+    return item.imageAsset ?? 'assets/images/items/${item.type.name}.png';
+  }
+
+  String _statLine(ItemStatType t, double v) {
+    String label;
+    bool percent = false;
+    switch (t) {
+      case ItemStatType.attack: label = 'Attack'; break;
+      case ItemStatType.defense: label = 'Defense'; break;
+      case ItemStatType.accuracy: label = 'Accuracy'; percent = true; break;
+      case ItemStatType.agility: label = 'Agility'; break;
+      case ItemStatType.critChance: label = 'Crit Chance'; percent = true; break;
+      case ItemStatType.critDamage: label = 'Crit Damage'; percent = true; break;
+      case ItemStatType.health: label = 'Health'; break;
+      case ItemStatType.evasion: label = 'Evasion'; percent = true; break;
+      case ItemStatType.stamina: label = 'Stamina'; break;
+    }
+    return percent ? '$label +${(v * 100).toStringAsFixed(0)}%'
+                   : '$label +${v.toStringAsFixed(v % 1 == 0 ? 0 : 1)}';
+  }
+
+  void _showItemDetails(BuildContext context, String label, Item item) {
+    final color = _rarityColor(item.rarity);
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Colors.black87,
+      builder: (_) {
+        final extras = item.stats.entries.toList();
+        String base;
+        switch (item.type) {
+          case ItemType.weapon: base = 'Attack +${item.power}'; break;
+          case ItemType.armor: base = 'Defense +${item.power}'; break;
+          case ItemType.ring: base = 'Accuracy +${item.power}'; break;
+          case ItemType.boots: base = 'Defense +${item.power}'; break;
+        }
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: Image.asset(_assetForItem(item), fit: BoxFit.contain,
+                      errorBuilder: (c, e, s) => Icon(Icons.inventory_2, color: color)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text('${item.name}', style: TextStyle(color: color, fontWeight: FontWeight.bold))),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('$label — $base', style: const TextStyle(color: Colors.white70)),
+              if (extras.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                const Text('Additional Stats', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                for (final e in extras)
+                  Text('• ${_statLine(e.key, e.value)}', style: const TextStyle(color: Colors.white70)),
+              ],
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.watch<GameState>().profile;
-    Widget cell(String label, Item? item) => Expanded(
-          child: Container(
-            height: 52,
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.5),
+
+Widget cell(String label, Item? item) => Expanded(
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: _rarityColor(item?.rarity)),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              item == null ? label : '$label: ${item.name}',
-              style: TextStyle(color: item == null ? Colors.white : _rarityColor(item.rarity)),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+              onTap: item == null ? null : () => _showItemDetails(context, label, item),
+              child: Container(
+                height: 90,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: _rarityColor(item?.rarity)),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                alignment: Alignment.center,
+                child: item == null
+                    ? const SizedBox.shrink()
+                    : Tooltip(
+                        message: item.stats.entries.map((e) => _statLine(e.key, e.value)).join('\n'),
+                        preferBelow: false,
+                        child: SizedBox(
+                          width: 36,
+                          height: 36,
+                          child: Image.asset(
+                            _assetForItem(item),
+                            fit: BoxFit.contain,
+                            errorBuilder: (c, e, s) => Icon(Icons.inventory_2, color: _rarityColor(item.rarity)),
+                          ),
+                        ),
+                      ),
+              ),
             ),
           ),
         );
+
     return Row(
       children: [
         cell('Weapon', p.weapon),
@@ -535,6 +627,7 @@ class _InventoryBar extends StatelessWidget {
     );
   }
 }
+
 
 class _AttackProgressBar extends StatelessWidget {
   const _AttackProgressBar({required this.label, required this.value, required this.color});

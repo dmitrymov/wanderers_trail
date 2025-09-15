@@ -24,6 +24,7 @@ class Item {
   final int level;
   final ItemRarity rarity;
   final Map<ItemStatType, double> stats; // additional stats beyond base
+  final String? imageAsset; // optional asset path for icon/sprite
 
   const Item({
     required this.id,
@@ -33,6 +34,7 @@ class Item {
     required this.level,
     required this.rarity,
     this.stats = const {},
+    this.imageAsset,
   });
 
   Item copyWith({
@@ -43,6 +45,7 @@ class Item {
     int? level,
     ItemRarity? rarity,
     Map<ItemStatType, double>? stats,
+    String? imageAsset,
   }) => Item(
         id: id ?? this.id,
         type: type ?? this.type,
@@ -51,6 +54,7 @@ class Item {
         level: level ?? this.level,
         rarity: rarity ?? this.rarity,
         stats: stats ?? this.stats,
+        imageAsset: imageAsset ?? this.imageAsset,
       );
 
   Map<String, dynamic> toJson() => {
@@ -61,6 +65,7 @@ class Item {
         'level': level,
         'rarity': rarity.name,
         'stats': stats.map((k, v) => MapEntry(k.name, v)),
+        'image': imageAsset,
       };
 
   factory Item.fromJson(Map<String, dynamic> json) {
@@ -92,6 +97,7 @@ class Item {
               orElse: () => ItemRarity.normal,
             ),
       stats: stats,
+      imageAsset: json['image'] as String?,
     );
   }
 
