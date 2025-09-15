@@ -134,6 +134,12 @@ class Item {
 
     final stats = _rollAdditionalStats(type, rarity, level, rnd);
     final name = _rarityPrefix(rarity) + baseName + ' +' + level.toString();
+
+    String? image;
+    if (type == ItemType.weapon) {
+      image = _weaponImagePath(rarity, rnd);
+    }
+
     return Item(
       id: idGen(),
       type: type,
@@ -142,7 +148,32 @@ class Item {
       level: level,
       rarity: rarity,
       stats: stats,
+      imageAsset: image,
     );
+  }
+
+  static String _rarityDigit(ItemRarity r) {
+    switch (r) {
+      case ItemRarity.normal:
+        return '0';
+      case ItemRarity.uncommon:
+        return '1';
+      case ItemRarity.rare:
+        return '2';
+      case ItemRarity.legendary:
+        return '3';
+      case ItemRarity.mystic:
+        return '4';
+    }
+  }
+
+  // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
+  static String _weaponImagePath(ItemRarity rarity, Random rnd) {
+    const categories = ['dagger', 'sword', 'axe', 'mace', 'spear', 'bow', 'staff'];
+    final cat = categories[rnd.nextInt(categories.length)];
+    final rarityCode = _rarityDigit(rarity);
+    final id = rnd.nextInt(10); // 0..9 id suffix
+    return 'assets/images/weapons/' + cat + '_' + rarityCode + id.toString() + '.png';
   }
 
   static ItemRarity _rollRarity(Random rnd) {
