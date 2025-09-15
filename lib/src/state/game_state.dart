@@ -70,6 +70,7 @@ class GameState extends ChangeNotifier {
       armor: null,
       ring: null,
       boots: null,
+      savedStep: null,
     );
     _invalidateStatsCache();
     notifyListeners();
@@ -80,7 +81,20 @@ class GameState extends ChangeNotifier {
     _profile = profile.copyWith(
       health: 100,
       stamina: 100,
+      savedStep: null,
     );
+    notifyListeners();
+    _persist();
+  }
+
+  void saveRunProgress(int step) {
+    _profile = profile.copyWith(savedStep: step);
+    notifyListeners();
+    _persist();
+  }
+
+  void clearRunProgress() {
+    _profile = profile.copyWith(savedStep: null);
     notifyListeners();
     _persist();
   }

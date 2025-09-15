@@ -15,6 +15,7 @@ class BattleTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final gs = context.watch<GameState>();
     final resumeStep = (gs.profile.highScore ~/ 50) * 50;
+    final canContinue = (gs.profile.savedStep ?? 0) > 0;
     return Center(
       child: ElevatedButton(
         onPressed: () async {
@@ -23,10 +24,21 @@ class BattleTab extends StatelessWidget {
             builder: (ctx) {
               return AlertDialog(
                 title: const Text('Start Journey'),
-                content: Text(resumeStep >= 50
-                    ? 'Start a new run from Step 0 (items reset), or resume from Step $resumeStep?'
-                    : 'Start a new run from Step 0 (items reset).'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (canContinue) Text('Continue from Step ${gs.profile.savedStep}'),
+                    if (resumeStep >= 50) Text('Resume checkpoint: Step $resumeStep'),
+                    const Text('New Run: Step 0 (items reset)'),
+                  ],
+                ),
                 actions: [
+                  if (canContinue)
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(_StartChoice.continueRun),
+                      child: const Text('Continue'),
+                    ),
                   TextButton(
                     onPressed: () => Navigator.of(ctx).pop(_StartChoice.newRun),
                     child: const Text('New Run'),
@@ -49,11 +61,17 @@ class BattleTab extends StatelessWidget {
             Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ActiveBattlePage(initialStep: 0)),
             );
-          } else {
+          } else if (choice == _StartChoice.resume) {
             gs.prepareForCheckpointRun();
             // ignore: use_build_context_synchronously
             Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => ActiveBattlePage(initialStep: resumeStep)),
+            );
+          } else if (choice == _StartChoice.continueRun) {
+            final step = gs.profile.savedStep ?? 0;
+            // ignore: use_build_context_synchronously
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => ActiveBattlePage(initialStep: step)),
             );
           }
         },
@@ -63,7 +81,8 @@ class BattleTab extends StatelessWidget {
   }
 }
 
-enum _StartChoice { newRun, resume }
+enum _StartChoice { newRun, resume, continueRun }
+
 
 class ActiveBattlePage extends StatefulWidget {
   const ActiveBattlePage({super.key, this.initialStep = 0});
@@ -346,13 +365,34 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     super.dispose();
   }
 
+  Future<bool> _onWillPop() async {
+    final gs = context.read<GameState>();
+    gs.saveRunProgress(_step);
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final gs = context.watch<GameState>();
     final p = gs.profile;
 
-    return Scaffold(
-      body: Stack(
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Battle'),
+          backgroundColor: Colors.black87,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () async {
+              if (await _onWillPop()) {
+                // ignore: use_build_context_synchronously
+                Navigator.of(context).pop();
+              }
+            },
+          ),
+        ),
+        body: Stack(
         children: [
           // Background path image (using existing asset for now)
           Positioned.fill(
@@ -522,6 +562,7 @@ child: SafeArea(
           ),
           ),
         ],
+        ),
       ),
     );
   }

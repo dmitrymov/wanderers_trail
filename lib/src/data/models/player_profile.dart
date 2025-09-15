@@ -13,6 +13,7 @@ class PlayerProfile {
   final Item? boots;
 
   final String? selectedPetId;
+  final int? savedStep; // last saved run step for Continue
 
   const PlayerProfile({
     required this.userId,
@@ -25,6 +26,7 @@ class PlayerProfile {
     this.ring,
     this.boots,
     this.selectedPetId,
+    this.savedStep,
   });
 
   PlayerProfile copyWith({
@@ -38,6 +40,7 @@ class PlayerProfile {
     Item? ring,
     Item? boots,
     String? selectedPetId,
+    int? savedStep,
   }) => PlayerProfile(
         userId: userId ?? this.userId,
         health: health ?? this.health,
@@ -49,6 +52,7 @@ class PlayerProfile {
         ring: ring ?? this.ring,
         boots: boots ?? this.boots,
         selectedPetId: selectedPetId ?? this.selectedPetId,
+        savedStep: savedStep ?? this.savedStep,
       );
 
   Map<String, dynamic> toJson() => {
@@ -62,6 +66,7 @@ class PlayerProfile {
         'ring': ring?.toJson(),
         'boots': boots?.toJson(),
         'selectedPetId': selectedPetId,
+        'savedStep': savedStep,
       };
 
   factory PlayerProfile.fromJson(Map<String, dynamic> json) => PlayerProfile(
@@ -76,6 +81,7 @@ class PlayerProfile {
         ring: json['ring'] == null ? null : Item.fromJson(json['ring'] as Map<String, dynamic>),
         boots: json['boots'] == null ? null : Item.fromJson(json['boots'] as Map<String, dynamic>),
         selectedPetId: json['selectedPetId'] as String?,
+        savedStep: (json['savedStep'] as num?)?.toInt(),
       );
 
   static PlayerProfile defaults({required String userId}) => PlayerProfile(
@@ -84,5 +90,6 @@ class PlayerProfile {
         stamina: 100,
         coins: 0,
         highScore: 0,
+        savedStep: null,
       );
 }
