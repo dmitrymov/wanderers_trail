@@ -86,9 +86,6 @@ flutter:
     - assets/images/
     - assets/images/items/
     - assets/images/weapons/
-    - assets/images/armor/
-    - assets/images/rings/
-    - assets/images/boots/
     - assets/images/enemies/
     - assets/images/backgrounds/
 

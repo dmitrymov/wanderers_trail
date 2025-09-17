@@ -8,6 +8,8 @@ import '../data/models/player_profile.dart';
 import '../data/repositories/game_repository.dart';
 import '../core/stats.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:convert';
+import 'package:flutter/services.dart' show rootBundle;
 
 class GameState extends ChangeNotifier {
   final GameRepository repo;
@@ -23,6 +25,44 @@ class GameState extends ChangeNotifier {
   StatsSummary? _statsCache;
   String? _cacheWeaponId, _cacheArmorId, _cacheRingId, _cacheBootsId;
 
+  // Asset readiness flag
+  bool _assetsReady = false;
+  bool get assetsReady => _assetsReady;
+
+  // Ephemeral combat state for tuning regen
+  bool _inCombat = false;
+  void setCombatActive(bool v) {
+    _inCombat = v;
+  }
+
+  // Temporary blessing state
+  DateTime? _blessUntil;
+  double _blessAttackSpeedMul = 1.0; // >1 means faster
+  double _blessStaminaRegenMul = 1.0; // >1 means more regen
+  bool get isBlessActive => _blessUntil != null && DateTime.now().isBefore(_blessUntil!);
+  double get attackSpeedMultiplier => isBlessActive ? _blessAttackSpeedMul : 1.0;
+  double get staminaRegenMultiplier => isBlessActive ? _blessStaminaRegenMul : 1.0;
+  int get blessRemainingSeconds {
+    if (!isBlessActive) return 0;
+    final secs = _blessUntil!.difference(DateTime.now()).inSeconds;
+    return max(0, secs);
+  }
+
+  String applyTemporaryBlessing({Duration duration = const Duration(seconds: 30)}) {
+    _blessUntil = DateTime.now().add(duration);
+    _blessAttackSpeedMul = 1.15; // +15% attack speed
+    _blessStaminaRegenMul = 1.5; // +50% regen
+    notifyListeners();
+    return 'Blessing of Vigor: +15% attack speed and +50% stamina regen for ${duration.inSeconds}s';
+  }
+
+  void clearBlessing() {
+    _blessUntil = null;
+    _blessAttackSpeedMul = 1.0;
+    _blessStaminaRegenMul = 1.0;
+    notifyListeners();
+  }
+
   static const PlayerProfile _placeholder = PlayerProfile(
     userId: 'local',
     health: 100,
@@ -34,15 +74,18 @@ class GameState extends ChangeNotifier {
   Future<void> init() async {
     // For now use a fixed local user id; later replace with auth uid.
     _profile = await repo.loadProfile(userId: 'local');
+    await _loadAssetManifest();
     _startRegen();
     notifyListeners();
   }
 
   void _startRegen() {
     _regenTimer?.cancel();
-    _regenTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+    _regenTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       final petBonus = selectedPet?.staminaRegenBonus ?? 0.0;
-      final regen = (2 * (1.0 + petBonus)).round();
+      // Base 2 stamina per second; +50% when not in combat
+      final idleMul = _inCombat ? 1.0 : 1.5;
+      final regen = (2 * (1.0 + petBonus) * idleMul * staminaRegenMultiplier).round();
       final s = (profile.stamina + regen).clamp(0, 100);
       _profile = profile.copyWith(stamina: s);
       notifyListeners();
@@ -162,15 +205,22 @@ class GameState extends ChangeNotifier {
     _persist();
   }
 
-  // Called when a monster is defeated; 40% chance to drop
+  // Called when a monster is defeated; 90% chance to drop
   Item? maybeDrop({required int runScore}) {
     final roll = Random().nextDouble();
-    if (roll < 0.4) {
-      return Item.randomDrop(runScore: runScore, idGen: () => _uuid.v4());
+    if (roll < 0.9) {
+      var it = Item.randomDrop(runScore: runScore, idGen: () => _uuid.v4());
+      // If weapon and we have known assets, pick a matching one by rarity
+      if (it.type == ItemType.weapon) {
+        final img = _pickWeaponImage(it);
+        if (img != null) {
+          it = it.copyWith(imageAsset: img);
+        }
+      }
+      return it;
     }
     return null;
   }
-
   Future<void> _persist() async {
     try {
       final p = profile;
@@ -186,6 +236,42 @@ class GameState extends ChangeNotifier {
     _cacheArmorId = null;
     _cacheRingId = null;
     _cacheBootsId = null;
+  }
+
+  // --- Asset manifest scanning for weapon images ---
+  List<String> _weaponAssets = [];
+
+  Future<void> _loadAssetManifest() async {
+    try {
+      final manifest = await rootBundle.loadString('AssetManifest.json');
+      final Map<String, dynamic> map = jsonDecode(manifest) as Map<String, dynamic>;
+      _weaponAssets = map.keys
+          .whereType<String>()
+          .where((k) => k.startsWith('assets/images/weapons/'))
+          .toList(growable: false);
+    } catch (_) {
+      _weaponAssets = const [];
+    } finally {
+      _assetsReady = true;
+    }
+  }
+
+  String? _pickWeaponImage(Item item) {
+    if (_weaponAssets.isEmpty) return null;
+    // rarity digit mapping
+    final rarityDigit = switch (item.rarity) {
+      ItemRarity.normal => '0',
+      ItemRarity.uncommon => '1',
+      ItemRarity.rare => '2',
+      ItemRarity.legendary => '3',
+      ItemRarity.mystic => '4',
+    };
+    // Match files that contain '_<rarityDigit><number>.png'
+    final reg = RegExp(r".*/.+?_" + rarityDigit + r"\d+\.png$", caseSensitive: false);
+    final candidates = _weaponAssets.where((p) => reg.hasMatch(p)).toList();
+    if (candidates.isEmpty) return null;
+    candidates.shuffle();
+    return candidates.first;
   }
 
   StatsSummary get statsSummary {

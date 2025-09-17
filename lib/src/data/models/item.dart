@@ -14,6 +14,7 @@ enum ItemStatType {
   health, // +max health maybe used later
   evasion, // 0..1 chance to dodge
   stamina, // max stamina bonus maybe used later
+  staminaCostReduction, // 0..1 percentage reducing stamina cost per step
 }
 
 class Item {
@@ -133,7 +134,7 @@ class Item {
     }
 
     final stats = _rollAdditionalStats(type, rarity, level, rnd);
-    final name = _rarityPrefix(rarity) + baseName + ' +' + level.toString();
+    final name = '${_rarityPrefix(rarity)}$baseName +$level';
 
     final image = _itemImagePath(type, rarity, rnd);
 
@@ -169,13 +170,9 @@ class Item {
       case ItemType.weapon:
         return _weaponImagePath(rarity, rnd);
       case ItemType.armor:
-        return _armorImagePath(rarity, rnd);
       case ItemType.ring:
-        return _ringImagePath(rarity, rnd);
       case ItemType.boots:
-        return _bootsImagePath(rarity, rnd);
-      default:
-        return null;
+        return null; // use generic icons for non-weapon items
     }
   }
   // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
@@ -184,8 +181,7 @@ class Item {
     final cat = categories[rnd.nextInt(categories.length)];
     final rarityCode = _rarityDigit(rarity);
     final id = rnd.nextInt(10); // 0..9 id suffix
-    //return 'assets/images/weapons/' + cat + '_' + rarityCode + id.toString() + '.png';
-    return 'assets/images/weapons/' + "dagger" + '_' + rarityCode + "1" + '.png';
+    return 'assets/images/weapons/${cat}_${rarityCode}$id.png';
   }
 
     // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
@@ -194,8 +190,7 @@ class Item {
     final cat = categories[rnd.nextInt(categories.length)];
     final rarityCode = _rarityDigit(rarity);
     final id = rnd.nextInt(10); // 0..9 id suffix
-    //return 'assets/images/boots/' + cat + '_' + rarityCode + id.toString() + '.png';
-    return 'assets/images/boots/' + cat + '_' + rarityCode + "1" + '.png';
+    return 'assets/images/boots/${cat}_${rarityCode}$id.png';
   }
 
     // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
@@ -204,8 +199,7 @@ class Item {
     final cat = categories[rnd.nextInt(categories.length)];
     final rarityCode = _rarityDigit(rarity);
     final id = rnd.nextInt(10); // 0..9 id suffix
-    //return 'assets/images/armor/' + cat + '_' + rarityCode + id.toString() + '.png';
-    return 'assets/images/armor/' + "armor" + '_' + rarityCode + "1" + '.png';
+    return 'assets/images/armor/${cat}_${rarityCode}$id.png';
   }
 
     // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
@@ -214,8 +208,7 @@ class Item {
     final cat = categories[rnd.nextInt(categories.length)];
     final rarityCode = _rarityDigit(rarity);
     final id = rnd.nextInt(10); // 0..9 id suffix
-    //return 'assets/images/rings/' + cat + '_' + rarityCode + id.toString() + '.png';
-    return 'assets/images/rings/' + "ring" + '_' + rarityCode + "1" + '.png';
+    return 'assets/images/rings/${cat}_${rarityCode}$id.png';
   }
 
   static ItemRarity _rollRarity(Random rnd) {
@@ -274,6 +267,7 @@ class Item {
           ItemStatType.evasion,
           ItemStatType.defense,
           ItemStatType.stamina,
+          ItemStatType.staminaCostReduction,
         ];
     }
   }
@@ -309,6 +303,9 @@ class Item {
         break;
       case ItemStatType.stamina:
         baseMin = 5; baseMax = 10;
+        break;
+      case ItemStatType.staminaCostReduction:
+        baseMin = 0.03; baseMax = 0.10; // 3%..10% base, scales with rarity/level
         break;
     }
     // Rarity scaling

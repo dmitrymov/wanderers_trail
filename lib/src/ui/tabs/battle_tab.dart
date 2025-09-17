@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../state/game_state.dart';
 import '../../data/models/item.dart';
+import '../../core/stats.dart';
 import '../widgets/item_drop_popup.dart';
 
 class BattleTab extends StatelessWidget {
@@ -106,6 +107,12 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
 
   final List<_DamageFloat> _floats = [];
 
+  // Poison effect tracking
+  DateTime? _nextPoisonTick;
+  int _poisonTicksRemaining = 0;
+  int _poisonDamagePerTick = 0;
+  int _poisonIntervalMs = 1000;
+
   @override
   void initState() {
     super.initState();
@@ -118,8 +125,16 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
       _handleDefeat();
       return;
     }
-    const staminaCost = 5;
+    // If fighting, do nothing; stamina only consumed when moving forward.
+    if (_monster != null) {
+      return;
+    }
+
+    const baseStaminaCost = 5;
     const hpPenaltyWhenExhausted = 2;
+    // Apply stamina cost reduction from items (percentage)
+    final reduction = _sumStat(gs, ItemStatType.staminaCostReduction).clamp(0.0, 0.9);
+    final staminaCost = (baseStaminaCost * (1.0 - reduction)).round().clamp(1, baseStaminaCost);
     final currentStamina = gs.profile.stamina;
 
     if (currentStamina >= staminaCost) {
@@ -135,11 +150,6 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
         return;
       }
     }
-
-    if (_monster != null) {
-      // Already fighting; advancing doesn't do extra strikes.
-      return;
-    }
     // Move forward when no monster is present.
     setState(() {
       _step += 1;
@@ -147,20 +157,30 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
       if (_rnd.nextDouble() < 0.35) {
         _monster = Monster.randomForStep(_step, _rnd);
         _startCombat(gs);
-      }
-      else if (_rnd.nextDouble() < 0.10) {
+      } else if (_rnd.nextDouble() < 0.10) {
         var restorePoints = 10 + (_step ~/ 10);
         gs.loseHealth(-restorePoints);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Restored $restorePoints health!")),
+          SnackBar(content: Text('Restored $restorePoints health!')),
         );
       }
     });
+    // Update best step and autosave/checkpoint
+    gs.updateHighScore(_step);
+    if (_step % 5 == 0) {
+      gs.saveRunProgress(_step);
+    }
+    if (_step % 50 == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Checkpoint reached: Step $_step')),
+      );
+    }
   }
 
   void _startCombat(GameState gs) {
     _stopCombat();
     if (_monster == null) return;
+    context.read<GameState>().setCombatActive(true);
     _playerIntervalMs = _calcPlayerIntervalMs(gs);
     _monsterIntervalMs = _monster!.attackMs;
     final now = DateTime.now();
@@ -173,6 +193,26 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
         return;
       }
       final now = DateTime.now();
+      // Safety: if somehow monster HP already 0, end immediately
+      if (_monster!.hp <= 0) {
+        final drop = gs.maybeDrop(runScore: _step);
+        setState(() => _monster = null);
+        context.read<GameState>().setCombatActive(false);
+        _stopCombat();
+        if (drop != null && mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => ItemDropPopup(item: drop, onEquip: () => gs.equip(drop)),
+          );
+        } else {
+          final msg = gs.applyTemporaryBlessing();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+          }
+        }
+        return;
+      }
       if (_nextPlayerHit != null && now.isAfter(_nextPlayerHit!)) {
         // Accuracy check
         final hitChance = (0.8 + _sumStat(gs, ItemStatType.accuracy)).clamp(0.1, 0.98);
@@ -207,14 +247,19 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           if (_monster!.hp <= 0) {
             final drop = gs.maybeDrop(runScore: _step);
             setState(() => _monster = null);
+            context.read<GameState>().setCombatActive(false);
             _stopCombat();
             if (drop != null && mounted) {
-              //item drop!
               showDialog(
                 context: context,
                 barrierDismissible: false,
                 builder: (_) => ItemDropPopup(item: drop, onEquip: () => gs.equip(drop)),
               );
+            } else {
+              final msg = gs.applyTemporaryBlessing();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+              }
             }
             return;
           }
@@ -240,7 +285,10 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
         final hit = _rnd.nextDouble() < hitChance;
         _nextMonsterHit = now.add(Duration(milliseconds: _monsterIntervalMs));
         if (hit) {
-          final raw = 2 + (_step ~/ 5) + _rnd.nextInt(3);
+          int raw = 2 + (_step ~/ 5) + _rnd.nextInt(3);
+          if (_monster!.name == 'Slime') {
+            raw = max(1, (raw * 0.7).round());
+          }
           final defense = _calcPlayerDefense(gs);
           final dmg = _reduceByDefense(raw, defense);
           // Spawn damage float near player HUD
@@ -255,7 +303,21 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
             rise: 30,
           ));
           gs.loseHealth(dmg);
+          if (_monster!.name == 'Spider') {
+            _applyPoison(ticks: 5, damagePerTick: 1, intervalMs: 1000);
+            final fx2 = 0.15 + (_rnd.nextDouble() - 0.5) * 0.12;
+            _floats.add(_DamageFloat(
+              text: 'poisoned',
+              color: Colors.lightGreenAccent,
+              start: now,
+              duration: const Duration(milliseconds: 700),
+              xFrac: fx2,
+              yFrac: 0.08,
+              rise: 18,
+            ));
+          }
           if (gs.profile.health <= 0) {
+            context.read<GameState>().setCombatActive(false);
             _stopCombat();
             _handleDefeat();
             return;
@@ -274,6 +336,29 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           ));
         }
       }
+      // Poison damage over time on player
+      if (_poisonTicksRemaining > 0 && _nextPoisonTick != null && now.isAfter(_nextPoisonTick!)) {
+        _nextPoisonTick = now.add(Duration(milliseconds: _poisonIntervalMs));
+        final pdmg = max(1, _poisonDamagePerTick);
+        final fx = 0.15 + (_rnd.nextDouble() - 0.5) * 0.12;
+        _floats.add(_DamageFloat(
+          text: '-$pdmg',
+          color: Colors.lightGreenAccent,
+          start: now,
+          duration: const Duration(milliseconds: 800),
+          xFrac: fx,
+          yFrac: 0.08,
+          rise: 20,
+        ));
+        gs.loseHealth(pdmg);
+        _poisonTicksRemaining -= 1;
+        if (gs.profile.health <= 0) {
+          context.read<GameState>().setCombatActive(false);
+          _stopCombat();
+          _handleDefeat();
+          return;
+        }
+      }
       // Cleanup expired floats
       _floats.removeWhere((f) => now.difference(f.start) > f.duration);
       // Always repaint to update progress bars smoothly and show floats.
@@ -286,6 +371,10 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     _combatTimer = null;
     _nextPlayerHit = null;
     _nextMonsterHit = null;
+    // Clear poison state
+    _nextPoisonTick = null;
+    _poisonTicksRemaining = 0;
+    _poisonDamagePerTick = 0;
   }
 
   int _calcPlayerIntervalMs(GameState gs) {
@@ -295,15 +384,19 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     // Agility speeds up attacks: -10ms per agility point
     final agility = _sumStat(gs, ItemStatType.agility);
     final agilityBonus = (agility * 10).round();
-    return (base - weaponBonus - agilityBonus).clamp(400, 2000);
+    final raw = (base - weaponBonus - agilityBonus).clamp(400, 2000);
+    final mult = gs.attackSpeedMultiplier <= 0 ? 1.0 : gs.attackSpeedMultiplier;
+    final adjusted = (raw / mult).round();
+    return adjusted.clamp(400, 2000);
   }
 
   int _calcPlayerDamage(GameState gs) {
-    const base = 5;
+    const base = StatsSummary.baseDamage;
     final weapon = gs.profile.weapon;
     final bonus = weapon?.power ?? 0;
     final extraAttack = _sumStat(gs, ItemStatType.attack).round();
-    return base + bonus + extraAttack;
+    final dmg = base + bonus + extraAttack;
+    return max(1, dmg);
   }
 
   // Aggregate a stat across equipped items
@@ -330,6 +423,17 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     final dr = defense / (defense + 50.0); // diminishing returns
     final reduced = (raw * (1 - dr)).round();
     return max(1, reduced);
+  }
+
+  void _applyPoison({required int ticks, required int damagePerTick, int intervalMs = 1000}) {
+    // Stack up to a reasonable cap to avoid infinite growth
+    _poisonTicksRemaining = (_poisonTicksRemaining + ticks).clamp(0, 15);
+    _poisonDamagePerTick = damagePerTick;
+    _poisonIntervalMs = intervalMs;
+    final now = DateTime.now();
+    _nextPoisonTick = (_nextPoisonTick == null || now.isAfter(_nextPoisonTick!))
+        ? now.add(Duration(milliseconds: _poisonIntervalMs))
+        : _nextPoisonTick;
   }
 
   double _progressTo(DateTime? next, int intervalMs) {
@@ -359,36 +463,71 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     );
   }
 
+  void _showBlessingInfo(BuildContext context, GameState gs) {
+    final spdPct = ((gs.attackSpeedMultiplier - 1) * 100).toStringAsFixed(0);
+    final regPct = ((gs.staminaRegenMultiplier - 1) * 100).toStringAsFixed(0);
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Colors.black87,
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.auto_awesome, color: Colors.amberAccent),
+                SizedBox(width: 8),
+                Text('Blessing of Vigor', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text('Time remaining: ${gs.blessRemainingSeconds}s', style: const TextStyle(color: Colors.white70)),
+            const SizedBox(height: 8),
+            Text('Effects:', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text('• Attack Speed +$spdPct%', style: const TextStyle(color: Colors.white70)),
+            Text('• Stamina Regen +$regPct%', style: const TextStyle(color: Colors.white70)),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
+    // Mark combat inactive on leave (just in case)
+    if (mounted) {
+      context.read<GameState>().setCombatActive(false);
+    }
     _stopCombat();
     super.dispose();
   }
 
-  Future<bool> _onWillPop() async {
-    final gs = context.read<GameState>();
-    gs.saveRunProgress(_step);
-    return true;
-  }
 
   @override
   Widget build(BuildContext context) {
     final gs = context.watch<GameState>();
     final p = gs.profile;
 
-    return WillPopScope(
-      onWillPop: _onWillPop,
+    return PopScope(
+      canPop: true,
+      onPopInvoked: (didPop) {
+        final gs2 = context.read<GameState>();
+        gs2.saveRunProgress(_step);
+      },
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Battle'),
           backgroundColor: Colors.black87,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () async {
-              if (await _onWillPop()) {
-                // ignore: use_build_context_synchronously
-                Navigator.of(context).pop();
-              }
+            onPressed: () {
+              final gs2 = context.read<GameState>();
+              gs2.saveRunProgress(_step);
+              Navigator.of(context).pop();
             },
           ),
         ),
@@ -408,7 +547,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
               padding: const EdgeInsets.all(12),
 child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.6),
+                  color: Colors.black.withOpacity(0.6),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.white24),
                 ),
@@ -417,6 +556,19 @@ child: Container(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('Step: $_step', style: const TextStyle(color: Colors.white)),
+                  if (gs.isBlessActive)
+                    InkWell(
+                      borderRadius: BorderRadius.circular(6),
+                      onTap: () => _showBlessingInfo(context, gs),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.auto_awesome, color: Colors.amberAccent, size: 16),
+                          const SizedBox(width: 4),
+                          Text('Bless ${gs.blessRemainingSeconds}s', style: const TextStyle(color: Colors.white)),
+                        ],
+                      ),
+                    ),
                   Text('HP: ${p.health}', style: const TextStyle(color: Colors.white)),
                   Text('Stamina: ${p.stamina}', style: const TextStyle(color: Colors.white)),
                 ],
@@ -431,7 +583,7 @@ child: Container(
                 padding: const EdgeInsets.only(top: 64.0),
 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.6),
+                    color: Colors.black.withOpacity(0.6),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.white24),
                   ),
@@ -520,7 +672,7 @@ child: SafeArea(
               minimum: const EdgeInsets.only(bottom: 12, left: 12, right: 12),
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.6),
+                  color: Colors.black.withOpacity(0.6),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.white24),
                 ),
@@ -603,6 +755,7 @@ class _InventoryBar extends StatelessWidget {
       case ItemStatType.health: label = 'Health'; break;
       case ItemStatType.evasion: label = 'Evasion'; percent = true; break;
       case ItemStatType.stamina: label = 'Stamina'; break;
+      case ItemStatType.staminaCostReduction: label = 'Stamina Cost Reduction'; percent = true; break;
     }
     return percent ? '$label +${(v * 100).toStringAsFixed(0)}%'
                    : '$label +${v.toStringAsFixed(v % 1 == 0 ? 0 : 1)}';
@@ -638,7 +791,7 @@ class _InventoryBar extends StatelessWidget {
                       errorBuilder: (c, e, s) => Icon(Icons.inventory_2, color: color)),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(child: Text('${item.name}', style: TextStyle(color: color, fontWeight: FontWeight.bold))),
+                  Expanded(child: Text(item.name, style: TextStyle(color: color, fontWeight: FontWeight.bold))),
                 ],
               ),
               const SizedBox(height: 8),
@@ -671,7 +824,7 @@ Widget cell(String label, Item? item) => Expanded(
               child: Container(
                 height: 90,
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.5),
+                  color: Colors.black.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: _rarityColor(item?.rarity)),
                 ),
@@ -834,7 +987,7 @@ class Monster {
     // Base 1000ms, adjust +/- up to 200ms, slightly faster as step increases
     final variance = rnd.nextInt(401) - 200; // -200..+200
     final faster = (step ~/ 15) * 50; // -0, -50, -100...
-    final ms = (1000 + variance - faster).clamp(500, 2000);
+    int ms = (1000 + variance - faster).clamp(500, 2000);
 
     // Defense scales slowly
     final defense = (2 + (step ~/ 6) + rnd.nextInt(3));
@@ -845,12 +998,14 @@ class Monster {
 
     const names = ['Slime', 'Wolf', 'Bandit', 'Spider'];
     final name = names[rnd.nextInt(names.length)];
-    final image = 'assets/images/enemies/' + name.toLowerCase() + '.png';
+    final image = 'assets/images/enemies/${name.toLowerCase()}.png';
+    // Wolf attacks faster
+    final attackMs = name == 'Wolf' ? (ms - 200).clamp(400, 2000) : ms;
     return Monster(
       name: name,
       hp: hp,
       maxHp: maxHp,
-      attackMs: ms,
+      attackMs: attackMs,
       defense: defense,
       accuracy: accuracy,
       imageAsset: image,

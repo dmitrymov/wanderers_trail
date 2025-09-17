@@ -73,10 +73,14 @@ class ItemDropPopup extends StatelessWidget {
       case ItemStatType.stamina:
         label = 'Stamina';
         break;
+      case ItemStatType.staminaCostReduction:
+        label = 'Stamina Cost Reduction';
+        percent = true;
+        break;
     }
-    return percent ? '$label +${(v * 100).toStringAsFixed(0)}%' : '$label +${v.toStringAsFixed(v % 1 == 0 ? 0 : 2)}';
+    return percent ? '$label +${(v * 100).toStringAsFixed(0)}%'
+        : '$label +${v.toStringAsFixed((v % 1 == 0) ? 0 : 2)}';
   }
-
   Color _deltaColor(num delta, {bool higherIsBetter = true}) {
     final good = higherIsBetter ? delta > 0 : delta < 0;
     final bad = higherIsBetter ? delta < 0 : delta > 0;
