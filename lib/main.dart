@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'src/ui/theme/app_theme.dart';
 
 import 'src/data/repositories/game_repository.dart';
 import 'src/data/repositories/local_game_repository.dart';
@@ -44,15 +45,15 @@ Future<void> main() async {
 
 class WanderersApp extends StatelessWidget {
   const WanderersApp({super.key});
+  static final navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: "Wanderer's Trail",
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        useMaterial3: true,
-      ),
+      theme: buildAppTheme(Brightness.light),
+      darkTheme: buildAppTheme(Brightness.dark),
       home: const HomeScaffold(),
     );
   }

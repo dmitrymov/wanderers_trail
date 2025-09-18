@@ -240,17 +240,62 @@ class GameState extends ChangeNotifier {
 
   // --- Asset manifest scanning for weapon images ---
   List<String> _weaponAssets = [];
+  final Map<String, List<String>> _enemyAssetsByType = {};
 
   Future<void> _loadAssetManifest() async {
     try {
       final manifest = await rootBundle.loadString('AssetManifest.json');
       final Map<String, dynamic> map = jsonDecode(manifest) as Map<String, dynamic>;
+      await _loadMonsterConfig();
+
+      // Weapons
       _weaponAssets = map.keys
           .whereType<String>()
           .where((k) => k.startsWith('assets/images/weapons/'))
+          .cast<String>()
           .toList(growable: false);
+
+      // Enemies: group by type subfolder if present
+      final enemyPaths = map.keys
+          .whereType<String>()
+          .where((k) => k.startsWith('assets/images/enemies/'))
+          .cast<String>()
+          .toList(growable: false);
+
+      _enemyAssetsByType.clear();
+      for (final p in enemyPaths) {
+        // Expect either enemies/<type>.png OR enemies/<type>/<variant>.png
+        final parts = p.split('/');
+        final int idx = parts.indexOf('enemies');
+        if (idx < 0) continue;
+        String type;
+        if (idx + 2 < parts.length && parts[idx + 2].endsWith('.png')) {
+          // enemies/<type>/<file.png>
+          type = parts[idx + 1].toLowerCase();
+        } else if (idx + 1 < parts.length && parts.last.endsWith('.png')) {
+          // enemies/<type>.png
+          type = parts[idx + 1].split('.').first.toLowerCase();
+        } else {
+          continue;
+        }
+        _enemyAssetsByType.putIfAbsent(type, () => []).add(p);
+      }
+
+      // Sort variants by numeric hint in filename/path (ascending), fallback by path
+      int _extractNum(String s) {
+        final m = RegExp(r'(\d+)').firstMatch(s);
+        return m == null ? 1 << 30 : int.tryParse(m.group(1)!) ?? (1 << 30);
+      }
+      for (final e in _enemyAssetsByType.entries) {
+        e.value.sort((a, b) {
+          final na = _extractNum(a), nb = _extractNum(b);
+          if (na != nb) return na.compareTo(nb);
+          return a.compareTo(b);
+        });
+      }
     } catch (_) {
       _weaponAssets = const [];
+      _enemyAssetsByType.clear();
     } finally {
       _assetsReady = true;
     }
@@ -272,6 +317,59 @@ class GameState extends ChangeNotifier {
     if (candidates.isEmpty) return null;
     candidates.shuffle();
     return candidates.first;
+  }
+
+  // ---- Monster balance/config ----
+  Map<String, dynamic> _monsterConfig = const {};
+
+  Future<void> _loadMonsterConfig() async {
+    try {
+      final s = await rootBundle.loadString('assets/config/monsters.json');
+      _monsterConfig = jsonDecode(s) as Map<String, dynamic>;
+    } catch (_) {
+      _monsterConfig = const {};
+    }
+  }
+
+  double _cfgNum(List<String> path, double fallback) {
+    dynamic cur = _monsterConfig;
+    for (final k in path) {
+      if (cur is Map<String, dynamic> && cur.containsKey(k)) {
+        cur = cur[k];
+      } else {
+        return fallback;
+      }
+    }
+    if (cur is num) return cur.toDouble();
+    return fallback;
+  }
+
+  int _cfgInt(List<String> path, int fallback) {
+    dynamic cur = _monsterConfig;
+    for (final k in path) {
+      if (cur is Map<String, dynamic> && cur.containsKey(k)) {
+        cur = cur[k];
+      } else {
+        return fallback;
+      }
+    }
+    if (cur is num) return cur.toInt();
+    return fallback;
+  }
+
+  // Public accessors for UI/game logic
+  double cfgNum(List<String> path, double fallback) => _cfgNum(path, fallback);
+  int cfgInt(List<String> path, int fallback) => _cfgInt(path, fallback);
+
+  String pickEnemyImage(String type, {required int difficultyIndex}) {
+    final key = type.toLowerCase();
+    final list = _enemyAssetsByType[key];
+    if (list == null || list.isEmpty) {
+      // Fallback to flat image if variants not found
+      return 'assets/images/enemies/$key.png';
+    }
+    final idx = difficultyIndex.clamp(0, list.length - 1);
+    return list[idx];
   }
 
   StatsSummary get statsSummary {

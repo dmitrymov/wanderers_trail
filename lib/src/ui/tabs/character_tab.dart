@@ -69,8 +69,9 @@ class CharacterTab extends StatelessWidget {
           name = 'Stamina';
           break;
         case ItemStatType.staminaCostReduction:
-          // TODO: Handle this case.
-          throw UnimplementedError();
+          name = 'Stamina Cost Reduction';
+          percent = true;
+          break;
       }
       final val = percent ? '+${(v * 100).toStringAsFixed(0)}%' : '+${v.toStringAsFixed(v % 1 == 0 ? 0 : 1)}';
       return '• $name $val';

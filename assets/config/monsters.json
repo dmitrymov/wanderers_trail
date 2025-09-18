@@ -1,0 +1,34 @@
+{
+  "score_weights": {
+    "hp_div": 50.0,
+    "def_div": 5.0,
+    "attack_speed_div": 400.0,
+    "accuracy_bias": 0.6,
+    "accuracy_weight": 5.0
+  },
+  "slime": {
+    "damage_factor": { "base": 0.7, "per_tier": 0.05, "max": 0.95 }
+  },
+  "wolf": {
+    "extra_claw": {
+      "base_chance": 0.2,
+      "chance_per_tier": 0.1,
+      "max_chance": 0.6,
+      "damage_factor": 0.5
+    }
+  },
+  "spider": {
+    "poison": {
+      "ticks_base": 5,
+      "ticks_per_tier": 1,
+      "damage_base": 2,
+      "damage_per_tier": 1,
+      "interval_base_ms": 1000,
+      "interval_delta_per_tier": -50,
+      "interval_min_ms": 600
+    }
+  },
+  "bandit": {
+    "coin_steal": { "base": 1, "per_tier": 2, "max": 50 }
+  }
+}

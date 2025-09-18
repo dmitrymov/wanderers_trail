@@ -8,6 +8,9 @@ import '../../state/game_state.dart';
 import '../../data/models/item.dart';
 import '../../core/stats.dart';
 import '../widgets/item_drop_popup.dart';
+import '../widgets/panel.dart';
+import '../widgets/stat_bar.dart';
+import '../overlay/overlay_service.dart';
 
 class BattleTab extends StatelessWidget {
   const BattleTab({super.key});
@@ -97,6 +100,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   int _step = 0;
   Monster? _monster;
   late final Random _rnd;
+  GameState? _gsRef; // provider reference cached for use in dispose
 
   // Auto-combat timing
   Timer? _combatTimer;
@@ -118,6 +122,12 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     super.initState();
     _rnd = Random();
     _step = widget.initialStep;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _gsRef ??= context.read<GameState>();
   }
 
   void _advance(GameState gs) {
@@ -151,18 +161,16 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
       }
     }
     // Move forward when no monster is present.
-    setState(() {
-      _step += 1;
-      // 35% chance to encounter a monster.
-      if (_rnd.nextDouble() < 0.35) {
-        _monster = Monster.randomForStep(_step, _rnd);
-        _startCombat(gs);
-      } else if (_rnd.nextDouble() < 0.10) {
+        setState(() {
+          _step += 1;
+          // 35% chance to encounter a monster.
+          if (_rnd.nextDouble() < 0.35) {
+            _monster = Monster.randomForStep(gs, _step, _rnd);
+            _startCombat(gs);
+          } else if (_rnd.nextDouble() < 0.10) {
         var restorePoints = 10 + (_step ~/ 10);
         gs.loseHealth(-restorePoints);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Restored $restorePoints health!')),
-        );
+        OverlayService.showToast('Restored $restorePoints health!');
       }
     });
     // Update best step and autosave/checkpoint
@@ -171,9 +179,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
       gs.saveRunProgress(_step);
     }
     if (_step % 50 == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Checkpoint reached: Step $_step')),
-      );
+      OverlayService.showToast('Checkpoint reached: Step $_step');
     }
   }
 
@@ -193,26 +199,26 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
         return;
       }
       final now = DateTime.now();
-      // Safety: if somehow monster HP already 0, end immediately
-      if (_monster!.hp <= 0) {
-        final drop = gs.maybeDrop(runScore: _step);
-        setState(() => _monster = null);
-        context.read<GameState>().setCombatActive(false);
-        _stopCombat();
-        if (drop != null && mounted) {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (_) => ItemDropPopup(item: drop, onEquip: () => gs.equip(drop)),
-          );
-        } else {
-          final msg = gs.applyTemporaryBlessing();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        // Safety: if somehow monster HP already 0, end immediately
+        if (_monster!.hp <= 0) {
+          final drop = gs.maybeDrop(runScore: _step);
+          setState(() => _monster = null);
+          gs.setCombatActive(false);
+          _stopCombat();
+          if (drop != null && mounted) {
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (_) => ItemDropPopup(item: drop, onEquip: () => gs.equip(drop)),
+            );
+          } else {
+            final msg = gs.applyTemporaryBlessing();
+            if (mounted) {
+              OverlayService.showToast(msg);
+            }
           }
+          return;
         }
-        return;
-      }
       if (_nextPlayerHit != null && now.isAfter(_nextPlayerHit!)) {
         // Accuracy check
         final hitChance = (0.8 + _sumStat(gs, ItemStatType.accuracy)).clamp(0.1, 0.98);
@@ -247,7 +253,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           if (_monster!.hp <= 0) {
             final drop = gs.maybeDrop(runScore: _step);
             setState(() => _monster = null);
-            context.read<GameState>().setCombatActive(false);
+            gs.setCombatActive(false);
             _stopCombat();
             if (drop != null && mounted) {
               showDialog(
@@ -258,7 +264,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
             } else {
               final msg = gs.applyTemporaryBlessing();
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                OverlayService.showToast(msg);
               }
             }
             return;
@@ -286,8 +292,13 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
         _nextMonsterHit = now.add(Duration(milliseconds: _monsterIntervalMs));
         if (hit) {
           int raw = 2 + (_step ~/ 5) + _rnd.nextInt(3);
-          if (_monster!.name == 'Slime') {
-            raw = max(1, (raw * 0.7).round());
+          if (_monster!.type == MonsterType.slime) {
+            // Higher tier slimes hit harder (less reduction)
+            final base = gs.cfgNum(['slime','damage_factor','base'], 0.7);
+            final per = gs.cfgNum(['slime','damage_factor','per_tier'], 0.05);
+            final maxF = gs.cfgNum(['slime','damage_factor','max'], 0.95);
+            final factor = (base + per * _monster!.tier).clamp(base, maxF);
+            raw = max(1, (raw * factor).round());
           }
           final defense = _calcPlayerDefense(gs);
           final dmg = _reduceByDefense(raw, defense);
@@ -303,8 +314,19 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
             rise: 30,
           ));
           gs.loseHealth(dmg);
-          if (_monster!.name == 'Spider') {
-            _applyPoison(ticks: 5, damagePerTick: 2, intervalMs: 1000);
+          if (_monster!.type == MonsterType.spider) {
+            final t = _monster!.tier;
+            final baseTicks = gs.cfgInt(['spider','poison','ticks_base'], 5);
+            final ticksPer = gs.cfgInt(['spider','poison','ticks_per_tier'], 1);
+            final dmgBase = gs.cfgInt(['spider','poison','damage_base'], 2);
+            final dmgPer = gs.cfgInt(['spider','poison','damage_per_tier'], 1);
+            final intBase = gs.cfgInt(['spider','poison','interval_base_ms'], 1000);
+            final intDelta = gs.cfgInt(['spider','poison','interval_delta_per_tier'], -50);
+            final intMin = gs.cfgInt(['spider','poison','interval_min_ms'], 600);
+            final ticks = baseTicks + t * ticksPer;
+            final perTick = dmgBase + t * dmgPer;
+            final int interval = max(intMin, min(2000, intBase + t * intDelta));
+            _applyPoison(ticks: ticks, damagePerTick: perTick, intervalMs: interval);
             final fx2 = 0.15 + (_rnd.nextDouble() - 0.5) * 0.12;
             _floats.add(_DamageFloat(
               text: 'poisoned',
@@ -316,8 +338,41 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
               rise: 18,
             ));
           }
+          // Wolf: chance for a rapid second claw at higher tiers
+          if (_monster!.type == MonsterType.wolf) {
+            final base = gs.cfgNum(['wolf','extra_claw','base_chance'], 0.2);
+            final per = gs.cfgNum(['wolf','extra_claw','chance_per_tier'], 0.1);
+            final maxChance = gs.cfgNum(['wolf','extra_claw','max_chance'], 0.6);
+            final dmgFactor = gs.cfgNum(['wolf','extra_claw','damage_factor'], 0.5);
+            final chance = (base + per * _monster!.tier).clamp(base, maxChance);
+            if (_rnd.nextDouble() < chance) {
+              final extra = max(1, (dmg * dmgFactor).round());
+              final fx3 = 0.18 + (_rnd.nextDouble() - 0.5) * 0.12;
+              _floats.add(_DamageFloat(
+                text: '-$extra',
+                color: Colors.redAccent,
+                start: now,
+                duration: const Duration(milliseconds: 600),
+                xFrac: fx3,
+                yFrac: 0.1,
+                rise: 16,
+              ));
+              gs.loseHealth(extra);
+            }
+          }
+          // Bandit: steals coins at higher tiers
+          if (_monster!.type == MonsterType.bandit) {
+            final base = gs.cfgInt(['bandit','coin_steal','base'], 1);
+            final per = gs.cfgInt(['bandit','coin_steal','per_tier'], 2);
+            final maxSt = gs.cfgInt(['bandit','coin_steal','max'], 50);
+            final int steal = max(base, min(maxSt, base + _monster!.tier * per));
+            final int taken = (gs.profile.coins >= steal) ? steal : gs.profile.coins;
+            if (taken > 0) {
+              gs.addCoins(-taken);
+            }
+          }
           if (gs.profile.health <= 0) {
-            context.read<GameState>().setCombatActive(false);
+            gs.setCombatActive(false);
             _stopCombat();
             _handleDefeat();
             return;
@@ -499,9 +554,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   @override
   void dispose() {
     // Mark combat inactive on leave (just in case)
-    if (mounted) {
-      context.read<GameState>().setCombatActive(false);
-    }
+    _gsRef?.setCombatActive(false);
     _stopCombat();
     super.dispose();
   }
@@ -545,37 +598,41 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(12),
-child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white24),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Panel(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Step: $_step', style: const TextStyle(color: Colors.white)),
-                  if (gs.isBlessActive)
-                    InkWell(
-                      borderRadius: BorderRadius.circular(6),
-                      onTap: () => _showBlessingInfo(context, gs),
-                      child: Row(
+                  children: [
+                    Text('Step: $_step', style: const TextStyle(color: Colors.white)),
+                    if (gs.isBlessActive)
+                      InkWell(
+                        borderRadius: BorderRadius.circular(6),
+                        onTap: () => _showBlessingInfo(context, gs),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.auto_awesome, color: Colors.amberAccent, size: 16),
+                            const SizedBox(width: 4),
+                            Text('Bless ${gs.blessRemainingSeconds}s', style: const TextStyle(color: Colors.white)),
+                          ],
+                        ),
+                      ),
+                    SizedBox(
+                      width: 180,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.auto_awesome, color: Colors.amberAccent, size: 16),
-                          const SizedBox(width: 4),
-                          Text('Bless ${gs.blessRemainingSeconds}s', style: const TextStyle(color: Colors.white)),
+                          StatBar(label: 'HP', value: p.health, max: 200, color: Colors.red, icon: Icons.favorite),
+                          const SizedBox(height: 6),
+                          StatBar(label: 'Stamina', value: p.stamina, max: 200, color: Colors.green, icon: Icons.bolt),
                         ],
                       ),
                     ),
-                  Text('HP: ${p.health}', style: const TextStyle(color: Colors.white)),
-                  Text('Stamina: ${p.stamina}', style: const TextStyle(color: Colors.white)),
-                ],
-              ),
+                  ],
                 ),
               ),
             ),
+          ),
           if (_monster != null)
             Align(
               alignment: Alignment.topCenter,
@@ -583,7 +640,7 @@ child: Container(
                 padding: const EdgeInsets.only(top: 64.0),
 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.6),
+color: Colors.black.withOpacity(0.6),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.white24),
                   ),
@@ -672,7 +729,7 @@ child: SafeArea(
               minimum: const EdgeInsets.only(bottom: 12, left: 12, right: 12),
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.6),
+color: Colors.black.withOpacity(0.6),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.white24),
                 ),
@@ -824,7 +881,7 @@ Widget cell(String label, Item? item) => Expanded(
               child: Container(
                 height: 90,
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.5),
+color: Colors.black.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: _rarityColor(item?.rarity)),
                 ),
@@ -953,8 +1010,12 @@ class _DamageFloat {
   });
 }
 
+enum MonsterType { slime, wolf, bandit, spider }
+
 class Monster {
   final String name;
+  final MonsterType type;
+  final int tier; // art/behavior tier inferred from stats
   final int hp;
   final int maxHp;
   final int attackMs; // attack interval in milliseconds
@@ -963,6 +1024,8 @@ class Monster {
   final String imageAsset; // enemy image asset path
   const Monster({
     required this.name,
+    required this.type,
+    required this.tier,
     required this.hp,
     required this.maxHp,
     required this.attackMs,
@@ -973,6 +1036,8 @@ class Monster {
 
   Monster hit(int damage) => Monster(
         name: name,
+        type: type,
+        tier: tier,
         hp: (hp - damage).clamp(0, maxHp),
         maxHp: maxHp,
         attackMs: attackMs,
@@ -981,7 +1046,7 @@ class Monster {
         imageAsset: imageAsset,
       );
 
-  static Monster randomForStep(int step, Random rnd) {
+  static Monster randomForStep(GameState gs, int step, Random rnd) {
     final maxHp = 12 + (step ~/ 5);
     final hp = maxHp;
     // Base 1000ms, adjust +/- up to 200ms, slightly faster as step increases
@@ -998,11 +1063,31 @@ class Monster {
 
     const names = ['Slime', 'Wolf', 'Bandit', 'Spider'];
     final name = names[rnd.nextInt(names.length)];
-    final image = 'assets/images/enemies/${name.toLowerCase()}.png';
-    // Wolf attacks faster
+    final type = switch (name) {
+      'Slime' => MonsterType.slime,
+      'Wolf' => MonsterType.wolf,
+      'Bandit' => MonsterType.bandit,
+      'Spider' => MonsterType.spider,
+      _ => MonsterType.slime,
+    };
+
+    // Wolf attacks faster baseline
     final attackMs = name == 'Wolf' ? (ms - 300).clamp(400, 2000) : ms;
+
+    // Difficulty index derived from monster stats (not step)
+    final hpDiv = gs.cfgNum(['score_weights', 'hp_div'], 50.0);
+    final defDiv = gs.cfgNum(['score_weights', 'def_div'], 5.0);
+    final spdDiv = gs.cfgNum(['score_weights', 'attack_speed_div'], 400.0);
+    final accBias = gs.cfgNum(['score_weights', 'accuracy_bias'], 0.6);
+    final accWeight = gs.cfgNum(['score_weights', 'accuracy_weight'], 5.0);
+    final score = (maxHp / hpDiv) + (defense / defDiv) + ((1200 - attackMs) / spdDiv) + ((accuracy - accBias) * accWeight);
+    final int difficultyIndex = max(0, min(999, score.isNaN ? 0 : score.floor()));
+    final image = gs.pickEnemyImage(name, difficultyIndex: difficultyIndex);
+
     return Monster(
       name: name,
+      type: type,
+      tier: difficultyIndex,
       hp: hp,
       maxHp: maxHp,
       attackMs: attackMs,
