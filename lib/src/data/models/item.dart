@@ -185,31 +185,10 @@ class Item {
   }
 
     // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
-  static String _bootsImagePath(ItemRarity rarity, Random rnd) {
-    const categories = ['boots'];
-    final cat = categories[rnd.nextInt(categories.length)];
-    final rarityCode = _rarityDigit(rarity);
-    final id = rnd.nextInt(10); // 0..9 id suffix
-    return 'assets/images/boots/${cat}_${rarityCode}$id.png';
-  }
 
     // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
-  static String _armorImagePath(ItemRarity rarity, Random rnd) {
-    const categories = ['armor', 'chestplate', 'robe', 'leather'];
-    final cat = categories[rnd.nextInt(categories.length)];
-    final rarityCode = _rarityDigit(rarity);
-    final id = rnd.nextInt(10); // 0..9 id suffix
-    return 'assets/images/armor/${cat}_${rarityCode}$id.png';
-  }
 
     // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
-  static String _ringImagePath(ItemRarity rarity, Random rnd) {
-    const categories = ['ring', 'amulet', 'earring'];
-    final cat = categories[rnd.nextInt(categories.length)];
-    final rarityCode = _rarityDigit(rarity);
-    final id = rnd.nextInt(10); // 0..9 id suffix
-    return 'assets/images/rings/${cat}_${rarityCode}$id.png';
-  }
 
   static ItemRarity _rollRarity(Random rnd) {
     final p = rnd.nextDouble();
@@ -335,16 +314,4 @@ class Item {
     }
   }
 
-  static String _nameFor(ItemType type, int level) {
-    switch (type) {
-      case ItemType.weapon:
-        return 'Rusty Blade +$level';
-      case ItemType.armor:
-        return 'Worn Plate +$level';
-      case ItemType.ring:
-        return 'Traveler Ring +$level';
-      case ItemType.boots:
-        return 'Road Boots +$level';
-    }
-  }
 }

@@ -304,7 +304,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           ));
           gs.loseHealth(dmg);
           if (_monster!.name == 'Spider') {
-            _applyPoison(ticks: 5, damagePerTick: 1, intervalMs: 1000);
+            _applyPoison(ticks: 5, damagePerTick: 2, intervalMs: 1000);
             final fx2 = 0.15 + (_rnd.nextDouble() - 0.5) * 0.12;
             _floats.add(_DamageFloat(
               text: 'poisoned',
@@ -514,7 +514,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
 
     return PopScope(
       canPop: true,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         final gs2 = context.read<GameState>();
         gs2.saveRunProgress(_step);
       },
@@ -547,7 +547,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
               padding: const EdgeInsets.all(12),
 child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6),
+                  color: Colors.black.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.white24),
                 ),
@@ -583,7 +583,7 @@ child: Container(
                 padding: const EdgeInsets.only(top: 64.0),
 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.6),
+                    color: Colors.black.withValues(alpha: 0.6),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.white24),
                   ),
@@ -672,7 +672,7 @@ child: SafeArea(
               minimum: const EdgeInsets.only(bottom: 12, left: 12, right: 12),
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6),
+                  color: Colors.black.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.white24),
                 ),
@@ -824,7 +824,7 @@ Widget cell(String label, Item? item) => Expanded(
               child: Container(
                 height: 90,
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
+                  color: Colors.black.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: _rarityColor(item?.rarity)),
                 ),
@@ -1000,7 +1000,7 @@ class Monster {
     final name = names[rnd.nextInt(names.length)];
     final image = 'assets/images/enemies/${name.toLowerCase()}.png';
     // Wolf attacks faster
-    final attackMs = name == 'Wolf' ? (ms - 200).clamp(400, 2000) : ms;
+    final attackMs = name == 'Wolf' ? (ms - 300).clamp(400, 2000) : ms;
     return Monster(
       name: name,
       hp: hp,
