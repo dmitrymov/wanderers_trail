@@ -46,7 +46,7 @@ class StatsSummary {
     final baseMs = 1000;
     final weaponMsBonus = (weapon == null ? 0 : weapon.power * 20);
     final agilityMsBonus = (sum(ItemStatType.agility) * 10).round();
-    final attackMs = (baseMs - weaponMsBonus - agilityMsBonus).clamp(400, 2000);
+    final int attackMs = ((baseMs - weaponMsBonus - agilityMsBonus).clamp(400, 2000)).toInt();
 
     // Expected hit chance and damage per hit
     final hitChance = (0.8 + accuracy).clamp(0.1, 0.98);

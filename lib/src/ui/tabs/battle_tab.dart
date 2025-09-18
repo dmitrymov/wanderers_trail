@@ -60,7 +60,7 @@ class BattleTab extends StatelessWidget {
           if (choice == null) return;
           if (choice == _StartChoice.newRun) {
             gs.resetForNewRun();
-            // Begin at step 0
+            // Ensure equipment is cleared before entering battle
             // ignore: use_build_context_synchronously
             Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ActiveBattlePage(initialStep: 0)),
@@ -97,6 +97,39 @@ class ActiveBattlePage extends StatefulWidget {
 }
 
 class _ActiveBattlePageState extends State<ActiveBattlePage> {
+  bool _leaveDialogOpen = false;
+
+  void _requestLeave() {
+    if (!mounted || _leaveDialogOpen) return;
+    _leaveDialogOpen = true;
+    // Schedule after current frame to avoid Navigator lock during back-pop
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showLeaveDialog();
+    });
+  }
+
+  Future<void> _showLeaveDialog() async {
+    if (!mounted) { _leaveDialogOpen = false; return; }
+    final gs2 = context.read<GameState>();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Leave battle?'),
+        content: const Text('Leaving will reset all equipment. You can continue from your last save point.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Stay')),
+          ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Leave')),
+        ],
+      ),
+    );
+    _leaveDialogOpen = false;
+    if (confirm == true) {
+      gs2.leaveBattleAndResetEquipment(saveStep: _step);
+      gs2.setCombatActive(false);
+      _stopCombat();
+      if (mounted) Navigator.of(context).pop();
+    }
+  }
   int _step = 0;
   Monster? _monster;
   late final Random _rnd;
@@ -325,7 +358,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
             final intMin = gs.cfgInt(['spider','poison','interval_min_ms'], 600);
             final ticks = baseTicks + t * ticksPer;
             final perTick = dmgBase + t * dmgPer;
-            final int interval = max(intMin, min(2000, intBase + t * intDelta));
+            final int interval = max(intMin, min(2000, intBase + t * intDelta)).toInt();
             _applyPoison(ticks: ticks, damagePerTick: perTick, intervalMs: interval);
             final fx2 = 0.15 + (_rnd.nextDouble() - 0.5) * 0.12;
             _floats.add(_DamageFloat(
@@ -365,7 +398,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
             final base = gs.cfgInt(['bandit','coin_steal','base'], 1);
             final per = gs.cfgInt(['bandit','coin_steal','per_tier'], 2);
             final maxSt = gs.cfgInt(['bandit','coin_steal','max'], 50);
-            final int steal = max(base, min(maxSt, base + _monster!.tier * per));
+            final int steal = max(base, min(maxSt, base + _monster!.tier * per)).toInt();
             final int taken = (gs.profile.coins >= steal) ? steal : gs.profile.coins;
             if (taken > 0) {
               gs.addCoins(-taken);
@@ -566,10 +599,9 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     final p = gs.profile;
 
     return PopScope(
-      canPop: true,
+      canPop: false,
       onPopInvokedWithResult: (didPop, result) {
-        final gs2 = context.read<GameState>();
-        gs2.saveRunProgress(_step);
+        _requestLeave();
       },
       child: Scaffold(
         appBar: AppBar(
@@ -577,12 +609,15 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           backgroundColor: Colors.black87,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              final gs2 = context.read<GameState>();
-              gs2.saveRunProgress(_step);
-              Navigator.of(context).pop();
-            },
+            onPressed: _requestLeave,
           ),
+          actions: [
+            TextButton.icon(
+              onPressed: _requestLeave,
+              icon: const Icon(Icons.exit_to_app, color: Colors.white),
+              label: const Text('Leave', style: TextStyle(color: Colors.white)),
+            ),
+          ],
         ),
         body: Stack(
         children: [
@@ -594,101 +629,95 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
               errorBuilder: (context, error, stack) => Container(color: Colors.black),
             ),
           ),
-          // Top HUD: step and monster HUD if present
+          // HUDs (top and enemy) stacked vertically in SafeArea so enemy HUD starts under HP/Stamina HUD
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(12),
-              child: Panel(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Step: $_step', style: const TextStyle(color: Colors.white)),
-                    if (gs.isBlessActive)
-                      InkWell(
-                        borderRadius: BorderRadius.circular(6),
-                        onTap: () => _showBlessingInfo(context, gs),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.auto_awesome, color: Colors.amberAccent, size: 16),
-                            const SizedBox(width: 4),
-                            Text('Bless ${gs.blessRemainingSeconds}s', style: const TextStyle(color: Colors.white)),
-                          ],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Panel(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Step: $_step', style: const TextStyle(color: Colors.white)),
+                        if (gs.isBlessActive)
+                          InkWell(
+                            borderRadius: BorderRadius.circular(6),
+                            onTap: () => _showBlessingInfo(context, gs),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.auto_awesome, color: Colors.amberAccent, size: 16),
+                                const SizedBox(width: 4),
+                                Text('Bless ${gs.blessRemainingSeconds}s', style: const TextStyle(color: Colors.white)),
+                              ],
+                            ),
+                          ),
+                        SizedBox(
+                          width: 180,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              StatBar(label: 'HP', value: p.health, max: 200, color: Colors.red, icon: Icons.favorite),
+                              const SizedBox(height: 6),
+                              StatBar(label: 'Stamina', value: p.stamina, max: 200, color: Colors.green, icon: Icons.bolt),
+                            ],
+                          ),
                         ),
-                      ),
-                    SizedBox(
-                      width: 180,
+                      ],
+                    ),
+                  ),
+                  if (_monster != null) ...[
+                    const SizedBox(height: 12),
+                    Panel(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          StatBar(label: 'HP', value: p.health, max: 200, color: Colors.red, icon: Icons.favorite),
+                          Text(
+                            _monster!.name,
+                            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: 96,
+                            height: 96,
+                            child: Image.asset(
+                              _monster!.imageAsset,
+                              fit: BoxFit.contain,
+                              errorBuilder: (c, e, s) => const Icon(Icons.pest_control, color: Colors.white54, size: 64),
+                            ),
+                          ),
                           const SizedBox(height: 6),
-                          StatBar(label: 'Stamina', value: p.stamina, max: 200, color: Colors.green, icon: Icons.bolt),
+                          _MonsterHpBar(current: _monster!.hp, max: _monster!.maxHp),
+                          const SizedBox(height: 8),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                            child: Column(
+                              children: [
+                                _AttackProgressBar(
+                                  label: 'You',
+                                  value: _progressTo(_nextPlayerHit, _playerIntervalMs),
+                                  color: Colors.green,
+                                ),
+                                const SizedBox(height: 6),
+                                _AttackProgressBar(
+                                  label: _monster!.name,
+                                  value: _progressTo(_nextMonsterHit, _monsterIntervalMs),
+                                  color: Colors.redAccent,
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
                   ],
-                ),
+                ],
               ),
             ),
           ),
-          if (_monster != null)
-            Align(
-              alignment: Alignment.topCenter,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 64.0),
-child: Container(
-                  decoration: BoxDecoration(
-color: Colors.black.withOpacity(0.6),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white24),
-                  ),
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                    Text(
-                      _monster!.name,
-                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: 96,
-                      height: 96,
-                      child: Image.asset(
-                        _monster!.imageAsset,
-                        fit: BoxFit.contain,
-                        errorBuilder: (c, e, s) => const Icon(Icons.pest_control, color: Colors.white54, size: 64),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    _MonsterHpBar(current: _monster!.hp, max: _monster!.maxHp),
-                    const SizedBox(height: 8),
-                    // Attack speed progress bars
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                      child: Column(
-                        children: [
-                          _AttackProgressBar(
-                            label: 'You',
-                            value: _progressTo(_nextPlayerHit, _playerIntervalMs),
-                            color: Colors.green,
-                          ),
-                          const SizedBox(height: 6),
-                          _AttackProgressBar(
-                            label: _monster!.name,
-                            value: _progressTo(_nextMonsterHit, _monsterIntervalMs),
-                            color: Colors.redAccent,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  ),
-                ),
-              ),
-            ),
           // Floating damage numbers overlay
           if (_floats.isNotEmpty)
             Positioned.fill(
@@ -751,8 +780,8 @@ color: Colors.black.withOpacity(0.6),
                         const SizedBox(width: 8),
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            child: const Text('Return'),
+                            onPressed: _requestLeave,
+                            child: const Text('Leave'),
                           ),
                         ),
                       ],
@@ -1081,7 +1110,7 @@ class Monster {
     final accBias = gs.cfgNum(['score_weights', 'accuracy_bias'], 0.6);
     final accWeight = gs.cfgNum(['score_weights', 'accuracy_weight'], 5.0);
     final score = (maxHp / hpDiv) + (defense / defDiv) + ((1200 - attackMs) / spdDiv) + ((accuracy - accBias) * accWeight);
-    final int difficultyIndex = max(0, min(999, score.isNaN ? 0 : score.floor()));
+    final int difficultyIndex = max(0, min(999, score.isNaN ? 0 : score.floor())).toInt();
     final image = gs.pickEnemyImage(name, difficultyIndex: difficultyIndex);
 
     return Monster(

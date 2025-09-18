@@ -105,23 +105,26 @@ class CharacterTab extends StatelessWidget {
     final gs = context.watch<GameState>();
     final p = gs.profile;
 
-    return ListView(
+    return gs.assetsReady
+        ? ListView(
       padding: const EdgeInsets.all(16),
       children: [
         const Text('Character', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Health: ${p.health}'),
+            const Expanded(child: Text('Health:')), 
+            Text('${p.health}'),
+            const SizedBox(width: 12),
             ElevatedButton(onPressed: gs.upgradeHealth, child: const Text('Upgrade')),
           ],
         ),
         const SizedBox(height: 8),
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Stamina: ${p.stamina}'),
+            const Expanded(child: Text('Stamina:')), 
+            Text('${p.stamina}'),
+            const SizedBox(width: 12),
             ElevatedButton(onPressed: gs.upgradeStamina, child: const Text('Upgrade')),
           ],
         ),
@@ -168,6 +171,7 @@ class CharacterTab extends StatelessWidget {
           ],
         ),
       ],
-    );
+    )
+        : const Center(child: CircularProgressIndicator());
   }
 }

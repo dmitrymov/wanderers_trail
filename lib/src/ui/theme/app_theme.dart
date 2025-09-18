@@ -27,7 +27,8 @@ ThemeData buildAppTheme(Brightness brightness) {
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        minimumSize: const Size.fromHeight(AppTokens.minButtonHeight),
+        // Important: avoid infinite minWidth which breaks buttons inside Rows/ListTiles
+        minimumSize: const Size(0, AppTokens.minButtonHeight),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppTokens.r12),
         ),
@@ -35,7 +36,7 @@ ThemeData buildAppTheme(Brightness brightness) {
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(AppTokens.minButtonHeight),
+        minimumSize: const Size(0, AppTokens.minButtonHeight),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppTokens.r12),
         ),

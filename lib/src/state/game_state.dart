@@ -109,7 +109,7 @@ class GameState extends ChangeNotifier {
     _profile = profile.copyWith(
       health: 100,
       stamina: 100,
-      weapon: null,
+      weapon: null, // cleared explicitly via sentinel-aware copyWith
       armor: null,
       ring: null,
       boots: null,
@@ -138,6 +138,23 @@ class GameState extends ChangeNotifier {
 
   void clearRunProgress() {
     _profile = profile.copyWith(savedStep: null);
+    notifyListeners();
+    _persist();
+  }
+
+  // Leave battle: save progress at given step and reset equipment so the next
+  // continue will start from the saved step with empty gear.
+  void leaveBattleAndResetEquipment({required int saveStep}) {
+    // Save current progress first
+    _profile = profile.copyWith(savedStep: saveStep);
+    // Reset equipment
+    _profile = profile.copyWith(
+      weapon: null,
+      armor: null,
+      ring: null,
+      boots: null,
+    );
+    _invalidateStatsCache();
     notifyListeners();
     _persist();
   }

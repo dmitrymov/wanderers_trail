@@ -29,30 +29,32 @@ class PlayerProfile {
     this.savedStep,
   });
 
+  static const Object _unset = Object();
+
   PlayerProfile copyWith({
     String? userId,
     int? health,
     int? stamina,
     int? coins,
     int? highScore,
-    Item? weapon,
-    Item? armor,
-    Item? ring,
-    Item? boots,
-    String? selectedPetId,
-    int? savedStep,
+    Object? weapon = _unset,
+    Object? armor = _unset,
+    Object? ring = _unset,
+    Object? boots = _unset,
+    Object? selectedPetId = _unset,
+    Object? savedStep = _unset,
   }) => PlayerProfile(
         userId: userId ?? this.userId,
         health: health ?? this.health,
         stamina: stamina ?? this.stamina,
         coins: coins ?? this.coins,
         highScore: highScore ?? this.highScore,
-        weapon: weapon ?? this.weapon,
-        armor: armor ?? this.armor,
-        ring: ring ?? this.ring,
-        boots: boots ?? this.boots,
-        selectedPetId: selectedPetId ?? this.selectedPetId,
-        savedStep: savedStep ?? this.savedStep,
+        weapon: identical(weapon, _unset) ? this.weapon : weapon as Item?,
+        armor: identical(armor, _unset) ? this.armor : armor as Item?,
+        ring: identical(ring, _unset) ? this.ring : ring as Item?,
+        boots: identical(boots, _unset) ? this.boots : boots as Item?,
+        selectedPetId: identical(selectedPetId, _unset) ? this.selectedPetId : selectedPetId as String?,
+        savedStep: identical(savedStep, _unset) ? this.savedStep : savedStep as int?,
       );
 
   Map<String, dynamic> toJson() => {
