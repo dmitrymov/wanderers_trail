@@ -11,6 +11,8 @@ import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
 
+enum PermanentUpgrade { health, stamina, attack, defense }
+
 class GameState extends ChangeNotifier {
   final GameRepository repo;
   GameState(this.repo);
@@ -24,6 +26,7 @@ class GameState extends ChangeNotifier {
   // Cached stats summary (recomputed when equipped item IDs change)
   StatsSummary? _statsCache;
   String? _cacheWeaponId, _cacheArmorId, _cacheRingId, _cacheBootsId;
+  int _cachePermAttackLevel = -1, _cachePermDefenseLevel = -1;
 
   // Asset readiness flag
   bool _assetsReady = false;
@@ -68,19 +71,47 @@ class GameState extends ChangeNotifier {
     health: 100,
     stamina: 100,
     coins: 0,
+    diamonds: 0,
     highScore: 0,
     maxHealth: 100,
     maxStamina: 100,
     healthUpgrades: 0,
     staminaUpgrades: 0,
+    permHealthLevel: 0,
+    permStaminaLevel: 0,
+    permAttackLevel: 0,
+    permDefenseLevel: 0,
   );
 
   // Upgrade config
   static const int healthUpgradeStep = 10;
   static const int staminaUpgradeStep = 10;
 
+  // Permanent upgrade steps and cost formula (diamonds)
+  static const int permHealthStep = 10;
+  static const int permStaminaStep = 10;
+  static const int permAttackStep = 1;
+  static const int permDefenseStep = 1;
+
   int get healthUpgradeCost => 10 + 5 * profile.healthUpgrades;
   int get staminaUpgradeCost => 10 + 5 * profile.staminaUpgrades;
+
+  // Diamonds and permanent upgrades
+  int get diamonds => profile.diamonds;
+  int get permHealthLevel => profile.permHealthLevel;
+  int get permStaminaLevel => profile.permStaminaLevel;
+  int get permAttackLevel => profile.permAttackLevel;
+  int get permDefenseLevel => profile.permDefenseLevel;
+
+  int permanentUpgradeCost(PermanentUpgrade u) {
+    final level = switch (u) {
+      PermanentUpgrade.health => permHealthLevel,
+      PermanentUpgrade.stamina => permStaminaLevel,
+      PermanentUpgrade.attack => permAttackLevel,
+      PermanentUpgrade.defense => permDefenseLevel,
+    };
+    return 20 + 10 * level; // simple scaling
+  }
 
   Future<void> init() async {
     // For now use a fixed local user id; later replace with auth uid.
@@ -117,11 +148,13 @@ class GameState extends ChangeNotifier {
   }
 
   void resetForNewRun() {
+    final baseMaxH = 100 + permHealthLevel * permHealthStep;
+    final baseMaxS = 100 + permStaminaLevel * permStaminaStep;
     _profile = profile.copyWith(
-      health: 100,
-      stamina: 100,
-      maxHealth: 100,
-      maxStamina: 100,
+      health: baseMaxH,
+      stamina: baseMaxS,
+      maxHealth: baseMaxH,
+      maxStamina: baseMaxS,
       healthUpgrades: 0,
       staminaUpgrades: 0,
       weapon: null, // cleared explicitly via sentinel-aware copyWith
@@ -137,11 +170,13 @@ class GameState extends ChangeNotifier {
   }
 
   void prepareForCheckpointRun() {
+    final baseMaxH = 100 + permHealthLevel * permHealthStep;
+    final baseMaxS = 100 + permStaminaLevel * permStaminaStep;
     _profile = profile.copyWith(
-      health: 100,
-      stamina: 100,
-      maxHealth: 100,
-      maxStamina: 100,
+      health: baseMaxH,
+      stamina: baseMaxS,
+      maxHealth: baseMaxH,
+      maxStamina: baseMaxS,
       healthUpgrades: 0,
       staminaUpgrades: 0,
       savedStep: null,
@@ -209,6 +244,12 @@ class GameState extends ChangeNotifier {
     _persist();
   }
 
+  void addDiamonds(int amount) {
+    _profile = profile.copyWith(diamonds: max(0, profile.diamonds + amount));
+    notifyListeners();
+    _persist();
+  }
+
   // Try to consume stamina; returns false if not enough.
   bool tryConsumeStamina(int amount) {
     if (profile.stamina < amount) return false;
@@ -255,6 +296,21 @@ class GameState extends ChangeNotifier {
     _persist();
   }
 
+  // Compute stats for an arbitrary loadout, including permanent upgrades
+  StatsSummary computeStats({Item? weapon, Item? armor, Item? ring, Item? boots}) {
+    final base = StatsSummary.fromItems(
+      weapon: weapon,
+      armor: armor,
+      ring: ring,
+      boots: boots,
+    );
+    return StatsSummary.withBonuses(
+      base,
+      attackBonus: permAttackLevel * permAttackStep,
+      defenseBonus: permDefenseLevel * permDefenseStep,
+    );
+  }
+
   // Called when a monster is defeated; 90% chance to drop
   Item? maybeDrop({required int runScore}) {
     final roll = Random().nextDouble();
@@ -286,6 +342,8 @@ class GameState extends ChangeNotifier {
     _cacheArmorId = null;
     _cacheRingId = null;
     _cacheBootsId = null;
+    _cachePermAttackLevel = -1;
+    _cachePermDefenseLevel = -1;
   }
 
   // --- Asset manifest scanning for weapon images ---
@@ -447,20 +505,74 @@ class GameState extends ChangeNotifier {
     final r = profile.ring?.id;
     final b = profile.boots?.id;
     final dirty = _statsCache == null ||
-        w != _cacheWeaponId || a != _cacheArmorId || r != _cacheRingId || b != _cacheBootsId;
+        w != _cacheWeaponId || a != _cacheArmorId || r != _cacheRingId || b != _cacheBootsId ||
+        _cachePermAttackLevel != permAttackLevel || _cachePermDefenseLevel != permDefenseLevel;
     if (dirty) {
-      _statsCache = StatsSummary.fromItems(
+      final base = StatsSummary.fromItems(
         weapon: profile.weapon,
         armor: profile.armor,
         ring: profile.ring,
         boots: profile.boots,
       );
+      final withPerm = StatsSummary.withBonuses(
+        base,
+        attackBonus: permAttackLevel * permAttackStep,
+        defenseBonus: permDefenseLevel * permDefenseStep,
+      );
+      _statsCache = withPerm;
       _cacheWeaponId = w;
       _cacheArmorId = a;
       _cacheRingId = r;
       _cacheBootsId = b;
+      _cachePermAttackLevel = permAttackLevel;
+      _cachePermDefenseLevel = permDefenseLevel;
     }
     return _statsCache!;
+  }
+
+  // Purchase a permanent upgrade using diamonds. Applies immediately to current run.
+  bool purchasePermanent(PermanentUpgrade u) {
+    final cost = permanentUpgradeCost(u);
+    if (profile.diamonds < cost) return false;
+    switch (u) {
+      case PermanentUpgrade.health:
+        final newMaxH = profile.maxHealth + permHealthStep;
+        final newHealth = min(profile.health, newMaxH);
+        _profile = profile.copyWith(
+          diamonds: profile.diamonds - cost,
+          permHealthLevel: profile.permHealthLevel + 1,
+          maxHealth: newMaxH,
+          health: newHealth,
+        );
+        break;
+      case PermanentUpgrade.stamina:
+        final newMaxS = profile.maxStamina + permStaminaStep;
+        final newStam = min(profile.stamina, newMaxS);
+        _profile = profile.copyWith(
+          diamonds: profile.diamonds - cost,
+          permStaminaLevel: profile.permStaminaLevel + 1,
+          maxStamina: newMaxS,
+          stamina: newStam,
+        );
+        break;
+      case PermanentUpgrade.attack:
+        _profile = profile.copyWith(
+          diamonds: profile.diamonds - cost,
+          permAttackLevel: profile.permAttackLevel + 1,
+        );
+        _invalidateStatsCache();
+        break;
+      case PermanentUpgrade.defense:
+        _profile = profile.copyWith(
+          diamonds: profile.diamonds - cost,
+          permDefenseLevel: profile.permDefenseLevel + 1,
+        );
+        _invalidateStatsCache();
+        break;
+    }
+    notifyListeners();
+    _persist();
+    return true;
   }
 
   @override

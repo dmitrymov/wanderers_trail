@@ -21,6 +21,27 @@ class StatsSummary {
     required this.dps,
   });
 
+  // Create a new summary by applying additive bonuses to attack/defense and
+  // recomputing DPS using same timing and rates.
+  static StatsSummary withBonuses(StatsSummary base, {int attackBonus = 0, int defenseBonus = 0}) {
+    final atk = (base.attack + attackBonus).clamp(1, 1000000);
+    final def = (base.defense + defenseBonus).clamp(0, 1000000);
+    final hitChance = (0.8 + base.accuracy).clamp(0.1, 0.98);
+    final expectedPerHit = atk * (1 + base.critChance.clamp(0, 0.95) * base.critDamage);
+    final hitsPerSecond = 1000.0 / base.attackMs;
+    final dps = expectedPerHit * hitChance * hitsPerSecond;
+    return StatsSummary(
+      attack: atk.toInt(),
+      defense: def.toInt(),
+      accuracy: base.accuracy,
+      evasion: base.evasion,
+      critChance: base.critChance,
+      critDamage: base.critDamage,
+      attackMs: base.attackMs,
+      dps: double.parse(dps.toStringAsFixed(1)),
+    );
+  }
+
   static const int baseDamage = 5;
 
   static StatsSummary fromItems({Item? weapon, Item? armor, Item? ring, Item? boots}) {

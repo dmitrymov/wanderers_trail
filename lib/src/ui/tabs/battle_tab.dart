@@ -450,12 +450,8 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   }
 
   int _calcPlayerDamage(GameState gs) {
-    const base = StatsSummary.baseDamage;
-    final weapon = gs.profile.weapon;
-    final bonus = weapon?.power ?? 0;
-    final extraAttack = _sumStat(gs, ItemStatType.attack).round();
-    final dmg = base + bonus + extraAttack;
-    return max(1, dmg);
+    // Use computed stats including permanent upgrades and items
+    return max(1, gs.statsSummary.attack);
   }
 
   // Aggregate a stat across equipped items
@@ -471,10 +467,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   }
 
   int _calcPlayerDefense(GameState gs) {
-    final p = gs.profile;
-    int base = (p.armor?.power ?? 0) + (p.boots?.power ?? 0);
-    final extra = _sumStat(gs, ItemStatType.defense).round();
-    return base + extra;
+    return gs.statsSummary.defense;
   }
 
   int _reduceByDefense(int raw, int defense) {
