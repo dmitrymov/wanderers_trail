@@ -2,10 +2,18 @@ import 'item.dart';
 
 class PlayerProfile {
   final String userId; // future login
-  final int health;
-  final int stamina;
+  final int health; // current health
+  final int stamina; // current stamina
   final int coins;
   final int highScore;
+
+  // Run-limited maximums (reset on New Run / Resume Checkpoint)
+  final int maxHealth;
+  final int maxStamina;
+
+  // Number of upgrades purchased this run (affects cost scaling)
+  final int healthUpgrades;
+  final int staminaUpgrades;
 
   final Item? weapon;
   final Item? armor;
@@ -21,6 +29,10 @@ class PlayerProfile {
     required this.stamina,
     required this.coins,
     required this.highScore,
+    required this.maxHealth,
+    required this.maxStamina,
+    required this.healthUpgrades,
+    required this.staminaUpgrades,
     this.weapon,
     this.armor,
     this.ring,
@@ -37,6 +49,10 @@ class PlayerProfile {
     int? stamina,
     int? coins,
     int? highScore,
+    int? maxHealth,
+    int? maxStamina,
+    int? healthUpgrades,
+    int? staminaUpgrades,
     Object? weapon = _unset,
     Object? armor = _unset,
     Object? ring = _unset,
@@ -49,6 +65,10 @@ class PlayerProfile {
         stamina: stamina ?? this.stamina,
         coins: coins ?? this.coins,
         highScore: highScore ?? this.highScore,
+        maxHealth: maxHealth ?? this.maxHealth,
+        maxStamina: maxStamina ?? this.maxStamina,
+        healthUpgrades: healthUpgrades ?? this.healthUpgrades,
+        staminaUpgrades: staminaUpgrades ?? this.staminaUpgrades,
         weapon: identical(weapon, _unset) ? this.weapon : weapon as Item?,
         armor: identical(armor, _unset) ? this.armor : armor as Item?,
         ring: identical(ring, _unset) ? this.ring : ring as Item?,
@@ -63,6 +83,10 @@ class PlayerProfile {
         'stamina': stamina,
         'coins': coins,
         'highScore': highScore,
+        'maxHealth': maxHealth,
+        'maxStamina': maxStamina,
+        'healthUpgrades': healthUpgrades,
+        'staminaUpgrades': staminaUpgrades,
         'weapon': weapon?.toJson(),
         'armor': armor?.toJson(),
         'ring': ring?.toJson(),
@@ -77,6 +101,10 @@ class PlayerProfile {
         stamina: (json['stamina'] as num).toInt(),
         coins: (json['coins'] as num).toInt(),
         highScore: (json['highScore'] as num).toInt(),
+        maxHealth: (json['maxHealth'] as num?)?.toInt() ?? (json['health'] as num).toInt(),
+        maxStamina: (json['maxStamina'] as num?)?.toInt() ?? (json['stamina'] as num).toInt(),
+        healthUpgrades: (json['healthUpgrades'] as num?)?.toInt() ?? 0,
+        staminaUpgrades: (json['staminaUpgrades'] as num?)?.toInt() ?? 0,
         weapon:
             json['weapon'] == null ? null : Item.fromJson(json['weapon'] as Map<String, dynamic>),
         armor: json['armor'] == null ? null : Item.fromJson(json['armor'] as Map<String, dynamic>),
@@ -92,6 +120,10 @@ class PlayerProfile {
         stamina: 100,
         coins: 0,
         highScore: 0,
+        maxHealth: 100,
+        maxStamina: 100,
+        healthUpgrades: 0,
+        staminaUpgrades: 0,
         savedStep: null,
       );
 }

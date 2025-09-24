@@ -10,20 +10,24 @@ class OverlayService {
     if (overlayState == null) return;
 
     final entry = OverlayEntry(
-      builder: (_) => Positioned(
-        top: 60,
-        left: 0,
-        right: 0,
+      builder: (_) => Positioned.fill(
         child: IgnorePointer(
           child: Center(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.85),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Text(message, style: const TextStyle(color: Colors.white)),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.85),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.2),
+                  ),
+                ),
               ),
             ),
           ),

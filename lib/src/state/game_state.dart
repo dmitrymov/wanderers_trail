@@ -69,7 +69,18 @@ class GameState extends ChangeNotifier {
     stamina: 100,
     coins: 0,
     highScore: 0,
+    maxHealth: 100,
+    maxStamina: 100,
+    healthUpgrades: 0,
+    staminaUpgrades: 0,
   );
+
+  // Upgrade config
+  static const int healthUpgradeStep = 10;
+  static const int staminaUpgradeStep = 10;
+
+  int get healthUpgradeCost => 10 + 5 * profile.healthUpgrades;
+  int get staminaUpgradeCost => 10 + 5 * profile.staminaUpgrades;
 
   Future<void> init() async {
     // For now use a fixed local user id; later replace with auth uid.
@@ -86,7 +97,7 @@ class GameState extends ChangeNotifier {
       // Base 2 stamina per second; +50% when not in combat
       final idleMul = _inCombat ? 1.0 : 1.5;
       final regen = (2 * (1.0 + petBonus) * idleMul * staminaRegenMultiplier).round();
-      final s = (profile.stamina + regen).clamp(0, 100);
+      final s = (profile.stamina + regen).clamp(0, profile.maxStamina).toInt();
       _profile = profile.copyWith(stamina: s);
       notifyListeners();
       _persist();
@@ -109,11 +120,16 @@ class GameState extends ChangeNotifier {
     _profile = profile.copyWith(
       health: 100,
       stamina: 100,
+      maxHealth: 100,
+      maxStamina: 100,
+      healthUpgrades: 0,
+      staminaUpgrades: 0,
       weapon: null, // cleared explicitly via sentinel-aware copyWith
       armor: null,
       ring: null,
       boots: null,
       savedStep: null,
+      coins: 0,
     );
     _invalidateStatsCache();
     notifyListeners();
@@ -124,6 +140,10 @@ class GameState extends ChangeNotifier {
     _profile = profile.copyWith(
       health: 100,
       stamina: 100,
+      maxHealth: 100,
+      maxStamina: 100,
+      healthUpgrades: 0,
+      staminaUpgrades: 0,
       savedStep: null,
     );
     notifyListeners();
@@ -142,33 +162,45 @@ class GameState extends ChangeNotifier {
     _persist();
   }
 
-  // Leave battle: save progress at given step and reset equipment so the next
-  // continue will start from the saved step with empty gear.
+  // Leave battle: save progress at given step and preserve equipment.
+  // Equipment should only be reset on a New Run.
   void leaveBattleAndResetEquipment({required int saveStep}) {
-    // Save current progress first
+    // Save current progress
     _profile = profile.copyWith(savedStep: saveStep);
-    // Reset equipment
+    notifyListeners();
+    _persist();
+  }
+
+  bool upgradeHealth() {
+    final cost = healthUpgradeCost;
+    if (profile.coins < cost) return false;
+    final newMax = profile.maxHealth + healthUpgradeStep;
+    final int newHealth = (profile.health + healthUpgradeStep).clamp(0, newMax).toInt();
     _profile = profile.copyWith(
-      weapon: null,
-      armor: null,
-      ring: null,
-      boots: null,
+      maxHealth: newMax,
+      health: newHealth,
+      coins: profile.coins - cost,
+      healthUpgrades: profile.healthUpgrades + 1,
     );
-    _invalidateStatsCache();
     notifyListeners();
     _persist();
+    return true;
   }
 
-  void upgradeHealth() {
-    _profile = profile.copyWith(health: (profile.health + 10).clamp(0, 200));
+  bool upgradeStamina() {
+    final cost = staminaUpgradeCost;
+    if (profile.coins < cost) return false;
+    final newMax = profile.maxStamina + staminaUpgradeStep;
+    final int newStamina = (profile.stamina + staminaUpgradeStep).clamp(0, newMax).toInt();
+    _profile = profile.copyWith(
+      maxStamina: newMax,
+      stamina: newStamina,
+      coins: profile.coins - cost,
+      staminaUpgrades: profile.staminaUpgrades + 1,
+    );
     notifyListeners();
     _persist();
-  }
-
-  void upgradeStamina() {
-    _profile = profile.copyWith(stamina: (profile.stamina + 10).clamp(0, 200));
-    notifyListeners();
-    _persist();
+    return true;
   }
 
   void addCoins(int amount) {
@@ -196,7 +228,8 @@ class GameState extends ChangeNotifier {
   }
 
   void loseHealth(int amount) {
-    _profile = profile.copyWith(health: max(0, profile.health - amount));
+    final int clamped = (profile.health - amount).clamp(0, profile.maxHealth).toInt();
+    _profile = profile.copyWith(health: clamped);
     notifyListeners();
     _persist();
   }
@@ -272,7 +305,7 @@ class GameState extends ChangeNotifier {
           .cast<String>()
           .toList(growable: false);
 
-      // Enemies: group by type subfolder if present
+      // Enemies: group by type subfolder if present, or by base filename without trailing digits
       final enemyPaths = map.keys
           .whereType<String>()
           .where((k) => k.startsWith('assets/images/enemies/'))
@@ -280,28 +313,33 @@ class GameState extends ChangeNotifier {
           .toList(growable: false);
 
       _enemyAssetsByType.clear();
-      for (final p in enemyPaths) {
-        // Expect either enemies/<type>.png OR enemies/<type>/<variant>.png
+
+      String _enemyTypeFromPath(String p) {
         final parts = p.split('/');
         final int idx = parts.indexOf('enemies');
-        if (idx < 0) continue;
-        String type;
-        if (idx + 2 < parts.length && parts[idx + 2].endsWith('.png')) {
-          // enemies/<type>/<file.png>
-          type = parts[idx + 1].toLowerCase();
-        } else if (idx + 1 < parts.length && parts.last.endsWith('.png')) {
-          // enemies/<type>.png
-          type = parts[idx + 1].split('.').first.toLowerCase();
-        } else {
-          continue;
+        if (idx < 0) return '';
+        // If nested like enemies/<type>/<file>.png prefer folder name
+        if (idx + 2 < parts.length && parts.last.toLowerCase().endsWith('.png')) {
+          return parts[idx + 1].toLowerCase();
         }
+        // Otherwise use filename base without trailing digits, e.g. bandit2.png -> bandit
+        final file = parts.last.toLowerCase();
+        if (!file.endsWith('.png')) return '';
+        final base = file.split('.').first;
+        // Remove trailing digits (e.g., bandit2 -> bandit)
+        return base.replaceFirst(RegExp(r'\d+$'), '');
+      }
+
+      for (final p in enemyPaths) {
+        final type = _enemyTypeFromPath(p);
+        if (type.isEmpty) continue;
         _enemyAssetsByType.putIfAbsent(type, () => []).add(p);
       }
 
-      // Sort variants by numeric hint in filename/path (ascending), fallback by path
+      // Sort variants by numeric hint in filename/path (ascending). Files without a number are treated as tier 1.
       int _extractNum(String s) {
         final m = RegExp(r'(\d+)').firstMatch(s);
-        return m == null ? 1 << 30 : int.tryParse(m.group(1)!) ?? (1 << 30);
+        return m == null ? 1 : int.tryParse(m.group(1)!) ?? 1;
       }
       for (final e in _enemyAssetsByType.entries) {
         e.value.sort((a, b) {
@@ -387,6 +425,20 @@ class GameState extends ChangeNotifier {
     }
     final idx = difficultyIndex.clamp(0, list.length - 1);
     return list[idx];
+  }
+
+  // Expose available variant paths/count for preloading or random selection
+  List<String> enemyVariantPaths(String type) {
+    final key = type.toLowerCase();
+    final list = _enemyAssetsByType[key];
+    if (list == null) return const [];
+    return List.unmodifiable(list);
+  }
+
+  int enemyVariantCount(String type) {
+    final key = type.toLowerCase();
+    final list = _enemyAssetsByType[key];
+    return list?.length ?? 0;
   }
 
   StatsSummary get statsSummary {

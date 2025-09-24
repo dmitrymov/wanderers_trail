@@ -113,19 +113,43 @@ class CharacterTab extends StatelessWidget {
         const SizedBox(height: 16),
         Row(
           children: [
-            const Expanded(child: Text('Health:')), 
-            Text('${p.health}'),
-            const SizedBox(width: 12),
-            ElevatedButton(onPressed: gs.upgradeHealth, child: const Text('Upgrade')),
+            const Expanded(child: Text('Coins:')),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.monetization_on, color: Colors.amber),
+                const SizedBox(width: 4),
+                Text('${p.coins}'),
+              ],
+            ),
           ],
         ),
         const SizedBox(height: 8),
         Row(
           children: [
-            const Expanded(child: Text('Stamina:')), 
-            Text('${p.stamina}'),
+            const Expanded(child: Text('Health:')),
+            Text('${p.health}/${p.maxHealth}'),
             const SizedBox(width: 12),
-            ElevatedButton(onPressed: gs.upgradeStamina, child: const Text('Upgrade')),
+            ElevatedButton(
+              onPressed: (p.coins >= gs.healthUpgradeCost)
+                  ? () => gs.upgradeHealth()
+                  : null,
+              child: Text('Upgrade +${GameState.healthUpgradeStep} (${gs.healthUpgradeCost} coins)'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            const Expanded(child: Text('Stamina:')),
+            Text('${p.stamina}/${p.maxStamina}'),
+            const SizedBox(width: 12),
+            ElevatedButton(
+              onPressed: (p.coins >= gs.staminaUpgradeCost)
+                  ? () => gs.upgradeStamina()
+                  : null,
+              child: Text('Upgrade +${GameState.staminaUpgradeStep} (${gs.staminaUpgradeCost} coins)'),
+            ),
           ],
         ),
         const SizedBox(height: 16),

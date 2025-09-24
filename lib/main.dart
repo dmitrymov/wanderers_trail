@@ -71,7 +71,7 @@ class _HomeScaffoldState extends State<HomeScaffold> {
 
   final _pages = const [
     ShopTab(),
-    CharacterTab(),
+    // CharacterTab(),
     BattleTab(),
     PetTab(),
   ];
@@ -85,7 +85,7 @@ class _HomeScaffoldState extends State<HomeScaffold> {
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.storefront), label: 'Shop'),
-          NavigationDestination(icon: Icon(Icons.person), label: 'Character'),
+          // NavigationDestination(icon: Icon(Icons.person), label: 'Character'),
           NavigationDestination(icon: Icon(Icons.sports_esports), label: 'Battle'),
           NavigationDestination(icon: Icon(Icons.pets), label: 'Pet'),
         ],

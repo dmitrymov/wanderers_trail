@@ -11,6 +11,7 @@ import '../widgets/item_drop_popup.dart';
 import '../widgets/panel.dart';
 import '../widgets/stat_bar.dart';
 import '../overlay/overlay_service.dart';
+import 'character_tab.dart';
 
 class BattleTab extends StatelessWidget {
   const BattleTab({super.key});
@@ -32,9 +33,9 @@ class BattleTab extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (canContinue) Text('Continue from Step ${gs.profile.savedStep}'),
-                    if (resumeStep >= 50) Text('Resume checkpoint: Step $resumeStep'),
-                    const Text('New Run: Step 0 (items reset)'),
+                    if (canContinue) Text('Continue from Step ${gs.profile.savedStep} (keep equipment)'),
+                    if (resumeStep >= 50) Text('Resume checkpoint: Step $resumeStep (keep equipment)'),
+                    const Text('New Run: Step 0 (equipment reset)'),
                   ],
                 ),
                 actions: [
@@ -115,7 +116,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Leave battle?'),
-        content: const Text('Leaving will reset all equipment. You can continue from your last save point.'),
+        content: const Text('Leaving will save your progress. You can continue from your last save point. Equipment will be preserved.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Stay')),
           ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Leave')),
@@ -234,22 +235,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
       final now = DateTime.now();
         // Safety: if somehow monster HP already 0, end immediately
         if (_monster!.hp <= 0) {
-          final drop = gs.maybeDrop(runScore: _step);
-          setState(() => _monster = null);
-          gs.setCombatActive(false);
-          _stopCombat();
-          if (drop != null && mounted) {
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (_) => ItemDropPopup(item: drop, onEquip: () => gs.equip(drop)),
-            );
-          } else {
-            final msg = gs.applyTemporaryBlessing();
-            if (mounted) {
-              OverlayService.showToast(msg);
-            }
-          }
+          _onMonsterDefeated(gs);
           return;
         }
       if (_nextPlayerHit != null && now.isAfter(_nextPlayerHit!)) {
@@ -284,22 +270,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
             _monster = _monster!.hit(finalDamage);
           });
           if (_monster!.hp <= 0) {
-            final drop = gs.maybeDrop(runScore: _step);
-            setState(() => _monster = null);
-            gs.setCombatActive(false);
-            _stopCombat();
-            if (drop != null && mounted) {
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (_) => ItemDropPopup(item: drop, onEquip: () => gs.equip(drop)),
-              );
-            } else {
-              final msg = gs.applyTemporaryBlessing();
-              if (mounted) {
-                OverlayService.showToast(msg);
-              }
-            }
+            _onMonsterDefeated(gs);
             return;
           }
         } else {
@@ -393,17 +364,17 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
               gs.loseHealth(extra);
             }
           }
-          // Bandit: steals coins at higher tiers
-          if (_monster!.type == MonsterType.bandit) {
-            final base = gs.cfgInt(['bandit','coin_steal','base'], 1);
-            final per = gs.cfgInt(['bandit','coin_steal','per_tier'], 2);
-            final maxSt = gs.cfgInt(['bandit','coin_steal','max'], 50);
-            final int steal = max(base, min(maxSt, base + _monster!.tier * per)).toInt();
-            final int taken = (gs.profile.coins >= steal) ? steal : gs.profile.coins;
-            if (taken > 0) {
-              gs.addCoins(-taken);
-            }
-          }
+          // // Bandit: steals coins at higher tiers
+          // if (_monster!.type == MonsterType.bandit) {
+          //   final base = gs.cfgInt(['bandit','coin_steal','base'], 1);
+          //   final per = gs.cfgInt(['bandit','coin_steal','per_tier'], 2);
+          //   final maxSt = gs.cfgInt(['bandit','coin_steal','max'], 50);
+          //   final int steal = max(base, min(maxSt, base + _monster!.tier * per)).toInt();
+          //   final int taken = (gs.profile.coins >= steal) ? steal : gs.profile.coins;
+          //   if (taken > 0) {
+          //     gs.addCoins(-taken);
+          //   }
+          // }
           if (gs.profile.health <= 0) {
             gs.setCombatActive(false);
             _stopCombat();
@@ -531,6 +502,35 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     return v.clamp(0.0, 1.0);
   }
 
+  int _coinsForKill() {
+    // Simple scaling: +2 base, +1 every 10 steps
+    return 2 + (_step ~/ 10);
+  }
+
+  void _onMonsterDefeated(GameState gs) {
+    final coins = _coinsForKill();
+    if (coins > 0) {
+      gs.addCoins(coins);
+      OverlayService.showToast('+$coins coins');//TODO: now its displayed in middle of item drop popup
+    }
+    final drop = gs.maybeDrop(runScore: _step);
+    setState(() => _monster = null);
+    gs.setCombatActive(false);
+    _stopCombat();
+    if (drop != null && mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => ItemDropPopup(item: drop, onEquip: () => gs.equip(drop)),
+      );
+    } else {
+      final msg = gs.applyTemporaryBlessing();
+      if (mounted) {
+        OverlayService.showToast(msg);
+      }
+    }
+  }
+
   void _handleDefeat() {
     showDialog(
       context: context,
@@ -584,6 +584,31 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     );
   }
 
+  void _openCharacterSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (sheetCtx) {
+        final h = MediaQuery.of(sheetCtx).size.height;
+        return SizedBox(
+          height: h * 0.92,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Character'),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.of(sheetCtx).pop(),
+              ),
+            ),
+            body: const CharacterTab(),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
     // Mark combat inactive on leave (just in case)
@@ -612,6 +637,11 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
             onPressed: _requestLeave,
           ),
           actions: [
+            IconButton(
+              tooltip: 'Character',
+              icon: const Icon(Icons.person, color: Colors.white),
+              onPressed: _openCharacterSheet,
+            ),
             TextButton.icon(
               onPressed: _requestLeave,
               icon: const Icon(Icons.exit_to_app, color: Colors.white),
@@ -640,7 +670,16 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Step: $_step', style: const TextStyle(color: Colors.white)),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('Step: $_step', style: const TextStyle(color: Colors.white)),
+                            const SizedBox(width: 12),
+                            const Icon(Icons.monetization_on, color: Colors.amber, size: 18),
+                            const SizedBox(width: 4),
+                            Text('${p.coins}', style: const TextStyle(color: Colors.white)),
+                          ],
+                        ),
                         if (gs.isBlessActive)
                           InkWell(
                             borderRadius: BorderRadius.circular(6),
@@ -660,9 +699,9 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              StatBar(label: 'HP', value: p.health, max: 200, color: Colors.red, icon: Icons.favorite),
+                              StatBar(label: 'HP', value: p.health, max: p.maxHealth, color: Colors.red, icon: Icons.favorite),
                               const SizedBox(height: 6),
-                              StatBar(label: 'Stamina', value: p.stamina, max: 200, color: Colors.green, icon: Icons.bolt),
+                              StatBar(label: 'Stamina', value: p.stamina, max: p.maxStamina, color: Colors.green, icon: Icons.bolt),
                             ],
                           ),
                         ),
@@ -1110,13 +1149,16 @@ class Monster {
     final accBias = gs.cfgNum(['score_weights', 'accuracy_bias'], 0.6);
     final accWeight = gs.cfgNum(['score_weights', 'accuracy_weight'], 5.0);
     final score = (maxHp / hpDiv) + (defense / defDiv) + ((1200 - attackMs) / spdDiv) + ((accuracy - accBias) * accWeight);
-    final int difficultyIndex = max(0, min(999, score.isNaN ? 0 : score.floor())).toInt();
-    final image = gs.pickEnemyImage(name, difficultyIndex: difficultyIndex);
+    // Keep combat tier behavior derived from stats as before
+    final int tierIndex = max(0, min(999, score.isNaN ? 0 : score.floor())).toInt();
+    // Image variant based on checkpoints of 50 steps: 0.. for [0-49]=0, [50-99]=1, etc.
+    final int imageIndex = (step ~/ 50);
+    final image = gs.pickEnemyImage(name, difficultyIndex: imageIndex);
 
     return Monster(
       name: name,
       type: type,
-      tier: difficultyIndex,
+      tier: tierIndex,
       hp: hp,
       maxHp: maxHp,
       attackMs: attackMs,
