@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/models/item.dart';
-import '../../core/stats.dart';
 import '../../state/game_state.dart';
 
 class ItemDropPopup extends StatelessWidget {
@@ -78,9 +77,11 @@ class ItemDropPopup extends StatelessWidget {
         percent = true;
         break;
     }
-    return percent ? '$label +${(v * 100).toStringAsFixed(0)}%'
+    return percent
+        ? '$label +${(v * 100).toStringAsFixed(0)}%'
         : '$label +${v.toStringAsFixed((v % 1 == 0) ? 0 : 2)}';
   }
+
   Color _deltaColor(num delta, {bool higherIsBetter = true}) {
     final good = higherIsBetter ? delta > 0 : delta < 0;
     final bad = higherIsBetter ? delta < 0 : delta > 0;
@@ -89,10 +90,19 @@ class ItemDropPopup extends StatelessWidget {
     return Colors.white70;
   }
 
-  Text _deltaText(String label, num before, num after, {bool percent = false, bool higherIsBetter = true}) {
+  Text _deltaText(
+    String label,
+    num before,
+    num after, {
+    bool percent = false,
+    bool higherIsBetter = true,
+  }) {
     final delta = after - before;
     final unit = percent ? '%' : '';
-    String fmt(num v) => percent ? v.toStringAsFixed(0) : v.toStringAsFixed((v % 1 == 0) ? 0 : 1);
+    String fmt(num v) =>
+        percent
+            ? v.toStringAsFixed(0)
+            : v.toStringAsFixed((v % 1 == 0) ? 0 : 1);
     final color = _deltaColor(delta, higherIsBetter: higherIsBetter);
     return Text(
       '$label: ${fmt(before)}$unit → ${fmt(after)}$unit (${delta >= 0 ? '+' : ''}${fmt(delta)}$unit)',
@@ -133,26 +143,56 @@ class ItemDropPopup extends StatelessWidget {
             style: TextStyle(color: color, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          Text('Type: ${item.type.name}') ,
+          Text('Type: ${item.type.name}'),
           const SizedBox(height: 8),
           Text(_baseLine(item)),
           if (statEntries.isNotEmpty) ...[
             const SizedBox(height: 8),
-            const Text('Additional Stats:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Additional Stats:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 4),
-            for (final e in statEntries)
-              Text('• ${_statLine(e.key, e.value)}'),
+            for (final e in statEntries) Text('• ${_statLine(e.key, e.value)}'),
           ],
           const SizedBox(height: 12),
-          const Text('Before → After (Δ)', style: TextStyle(fontWeight: FontWeight.bold)),
+          const Text(
+            'Before → After (Δ)',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 4),
           _deltaText('Attack', current.attack, cand.attack),
           _deltaText('Defense', current.defense, cand.defense),
-          _deltaText('Accuracy', current.accuracy * 100, cand.accuracy * 100, percent: true),
-          _deltaText('Evasion', current.evasion * 100, cand.evasion * 100, percent: true),
-          _deltaText('Crit Chance', current.critChance * 100, cand.critChance * 100, percent: true),
-          _deltaText('Crit Damage', current.critDamage * 100, cand.critDamage * 100, percent: true),
-          _deltaText('Attack Speed (ms)', current.attackMs, cand.attackMs, higherIsBetter: false),
+          _deltaText(
+            'Accuracy',
+            current.accuracy * 100,
+            cand.accuracy * 100,
+            percent: true,
+          ),
+          _deltaText(
+            'Evasion',
+            current.evasion * 100,
+            cand.evasion * 100,
+            percent: true,
+          ),
+          _deltaText(
+            'Crit Chance',
+            current.critChance * 100,
+            cand.critChance * 100,
+            percent: true,
+          ),
+          _deltaText(
+            'Crit Damage',
+            current.critDamage * 100,
+            cand.critDamage * 100,
+            percent: true,
+          ),
+          _deltaText(
+            'Attack Speed (ms)',
+            current.attackMs,
+            cand.attackMs,
+            higherIsBetter: false,
+          ),
           _deltaText('DPS', current.dps, cand.dps),
         ],
       ),
@@ -167,7 +207,7 @@ class ItemDropPopup extends StatelessWidget {
             Navigator.of(context).pop();
           },
           child: const Text('Equip'),
-        )
+        ),
       ],
     );
   }

@@ -48,26 +48,26 @@ class Item {
     Map<ItemStatType, double>? stats,
     String? imageAsset,
   }) => Item(
-        id: id ?? this.id,
-        type: type ?? this.type,
-        name: name ?? this.name,
-        power: power ?? this.power,
-        level: level ?? this.level,
-        rarity: rarity ?? this.rarity,
-        stats: stats ?? this.stats,
-        imageAsset: imageAsset ?? this.imageAsset,
-      );
+    id: id ?? this.id,
+    type: type ?? this.type,
+    name: name ?? this.name,
+    power: power ?? this.power,
+    level: level ?? this.level,
+    rarity: rarity ?? this.rarity,
+    stats: stats ?? this.stats,
+    imageAsset: imageAsset ?? this.imageAsset,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'type': type.name,
-        'name': name,
-        'power': power,
-        'level': level,
-        'rarity': rarity.name,
-        'stats': stats.map((k, v) => MapEntry(k.name, v)),
-        'image': imageAsset,
-      };
+    'id': id,
+    'type': type.name,
+    'name': name,
+    'power': power,
+    'level': level,
+    'rarity': rarity.name,
+    'stats': stats.map((k, v) => MapEntry(k.name, v)),
+    'image': imageAsset,
+  };
 
   factory Item.fromJson(Map<String, dynamic> json) {
     final rarityStr = json['rarity'] as String?;
@@ -91,18 +91,22 @@ class Item {
       name: json['name'] as String,
       power: (json['power'] as num).toInt(),
       level: (json['level'] as num?)?.toInt() ?? 1,
-      rarity: rarityStr == null
-          ? ItemRarity.normal
-          : ItemRarity.values.firstWhere(
-              (r) => r.name == rarityStr,
-              orElse: () => ItemRarity.normal,
-            ),
+      rarity:
+          rarityStr == null
+              ? ItemRarity.normal
+              : ItemRarity.values.firstWhere(
+                (r) => r.name == rarityStr,
+                orElse: () => ItemRarity.normal,
+              ),
       stats: stats,
       imageAsset: json['image'] as String?,
     );
   }
 
-  static Item randomDrop({required int runScore, required String Function() idGen}) {
+  static Item randomDrop({
+    required int runScore,
+    required String Function() idGen,
+  }) {
     final rnd = Random();
     final roll = rnd.nextInt(4);
     final type = ItemType.values[roll];
@@ -164,7 +168,7 @@ class Item {
         return '4';
     }
   }
-  
+
   static String? _itemImagePath(ItemType type, ItemRarity rarity, Random rnd) {
     switch (type) {
       case ItemType.weapon:
@@ -175,20 +179,29 @@ class Item {
         return null; // use generic icons for non-weapon items
     }
   }
+
   // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
   static String _weaponImagePath(ItemRarity rarity, Random rnd) {
-    const categories = ['dagger', 'sword', 'axe', 'mace', 'spear', 'bow', 'staff'];
+    const categories = [
+      'dagger',
+      'sword',
+      'axe',
+      'mace',
+      'spear',
+      'bow',
+      'staff',
+    ];
     final cat = categories[rnd.nextInt(categories.length)];
     final rarityCode = _rarityDigit(rarity);
     final id = rnd.nextInt(10); // 0..9 id suffix
-    return 'assets/images/weapons/${cat}_${rarityCode}$id.png';
+    return 'assets/images/weapons/${cat}_$rarityCode$id.png';
   }
 
-    // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
+  // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
 
-    // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
+  // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
 
-    // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
+  // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
 
   static ItemRarity _rollRarity(Random rnd) {
     final p = rnd.nextDouble();
@@ -200,7 +213,11 @@ class Item {
   }
 
   static Map<ItemStatType, double> _rollAdditionalStats(
-      ItemType type, ItemRarity rarity, int level, Random rnd) {
+    ItemType type,
+    ItemRarity rarity,
+    int level,
+    Random rnd,
+  ) {
     int extra = switch (rarity) {
       ItemRarity.normal => 0,
       ItemRarity.uncommon => 1,
@@ -252,39 +269,53 @@ class Item {
   }
 
   static double _rollStatValue(
-      ItemStatType t, int level, Random rnd, ItemRarity rarity) {
+    ItemStatType t,
+    int level,
+    Random rnd,
+    ItemRarity rarity,
+  ) {
     final scale = 1 + level * 0.2;
     double baseMin, baseMax;
     switch (t) {
       case ItemStatType.attack:
-        baseMin = 1; baseMax = 3;
+        baseMin = 1;
+        baseMax = 3;
         break;
       case ItemStatType.defense:
-        baseMin = 1; baseMax = 3;
+        baseMin = 1;
+        baseMax = 3;
         break;
       case ItemStatType.accuracy:
-        baseMin = 0.02; baseMax = 0.05; // +2%..+5%
+        baseMin = 0.02;
+        baseMax = 0.05; // +2%..+5%
         break;
       case ItemStatType.agility:
-        baseMin = 1; baseMax = 4; // points -> ms reduction later
+        baseMin = 1;
+        baseMax = 4; // points -> ms reduction later
         break;
       case ItemStatType.critChance:
-        baseMin = 0.02; baseMax = 0.06; // 2%..6%
+        baseMin = 0.02;
+        baseMax = 0.06; // 2%..6%
         break;
       case ItemStatType.critDamage:
-        baseMin = 0.10; baseMax = 0.25; // +10%..+25%
+        baseMin = 0.10;
+        baseMax = 0.25; // +10%..+25%
         break;
       case ItemStatType.health:
-        baseMin = 5; baseMax = 15;
+        baseMin = 5;
+        baseMax = 15;
         break;
       case ItemStatType.evasion:
-        baseMin = 0.01; baseMax = 0.04; // 1%..4%
+        baseMin = 0.01;
+        baseMax = 0.04; // 1%..4%
         break;
       case ItemStatType.stamina:
-        baseMin = 5; baseMax = 10;
+        baseMin = 5;
+        baseMax = 10;
         break;
       case ItemStatType.staminaCostReduction:
-        baseMin = 0.03; baseMax = 0.10; // 3%..10% base, scales with rarity/level
+        baseMin = 0.03;
+        baseMax = 0.10; // 3%..10% base, scales with rarity/level
         break;
     }
     // Rarity scaling
@@ -313,5 +344,4 @@ class Item {
         return 'Mystic ';
     }
   }
-
 }

@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../state/game_state.dart';
 import '../../data/models/item.dart';
-import '../../core/stats.dart';
+
 import '../widgets/item_drop_popup.dart';
 import '../widgets/panel.dart';
 import '../widgets/stat_bar.dart';
@@ -33,15 +33,22 @@ class BattleTab extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (canContinue) Text('Continue from Step ${gs.profile.savedStep} (keep equipment)'),
-                    if (resumeStep >= 50) Text('Resume checkpoint: Step $resumeStep (keep equipment)'),
+                    if (canContinue)
+                      Text(
+                        'Continue from Step ${gs.profile.savedStep} (keep equipment)',
+                      ),
+                    if (resumeStep >= 50)
+                      Text(
+                        'Resume checkpoint: Step $resumeStep (keep equipment)',
+                      ),
                     const Text('New Run: Step 0 (equipment reset)'),
                   ],
                 ),
                 actions: [
                   if (canContinue)
                     TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(_StartChoice.continueRun),
+                      onPressed:
+                          () => Navigator.of(ctx).pop(_StartChoice.continueRun),
                       child: const Text('Continue'),
                     ),
                   TextButton(
@@ -50,7 +57,8 @@ class BattleTab extends StatelessWidget {
                   ),
                   if (resumeStep >= 50)
                     ElevatedButton(
-                      onPressed: () => Navigator.of(ctx).pop(_StartChoice.resume),
+                      onPressed:
+                          () => Navigator.of(ctx).pop(_StartChoice.resume),
                       child: Text('Resume $resumeStep'),
                     ),
                 ],
@@ -64,19 +72,25 @@ class BattleTab extends StatelessWidget {
             // Ensure equipment is cleared before entering battle
             // ignore: use_build_context_synchronously
             Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ActiveBattlePage(initialStep: 0)),
+              MaterialPageRoute(
+                builder: (_) => const ActiveBattlePage(initialStep: 0),
+              ),
             );
           } else if (choice == _StartChoice.resume) {
             gs.prepareForCheckpointRun();
             // ignore: use_build_context_synchronously
             Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => ActiveBattlePage(initialStep: resumeStep)),
+              MaterialPageRoute(
+                builder: (_) => ActiveBattlePage(initialStep: resumeStep),
+              ),
             );
           } else if (choice == _StartChoice.continueRun) {
             final step = gs.profile.savedStep ?? 0;
             // ignore: use_build_context_synchronously
             Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => ActiveBattlePage(initialStep: step)),
+              MaterialPageRoute(
+                builder: (_) => ActiveBattlePage(initialStep: step),
+              ),
             );
           }
         },
@@ -87,7 +101,6 @@ class BattleTab extends StatelessWidget {
 }
 
 enum _StartChoice { newRun, resume, continueRun }
-
 
 class ActiveBattlePage extends StatefulWidget {
   const ActiveBattlePage({super.key, this.initialStep = 0});
@@ -110,18 +123,30 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   }
 
   Future<void> _showLeaveDialog() async {
-    if (!mounted) { _leaveDialogOpen = false; return; }
+    if (!mounted) {
+      _leaveDialogOpen = false;
+      return;
+    }
     final gs2 = context.read<GameState>();
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Leave battle?'),
-        content: const Text('Leaving will save your progress. You can continue from your last save point. Equipment will be preserved.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Stay')),
-          ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Leave')),
-        ],
-      ),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Leave battle?'),
+            content: const Text(
+              'Leaving will save your progress. You can continue from your last save point. Equipment will be preserved.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Stay'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Leave'),
+              ),
+            ],
+          ),
     );
     _leaveDialogOpen = false;
     if (confirm == true) {
@@ -131,6 +156,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
       if (mounted) Navigator.of(context).pop();
     }
   }
+
   int _step = 0;
   Monster? _monster;
   late final Random _rnd;
@@ -150,6 +176,83 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   int _poisonTicksRemaining = 0;
   int _poisonDamagePerTick = 0;
   int _poisonIntervalMs = 1000;
+
+  // Combat Log
+  final List<_LogEntry> _logs = [];
+  final ScrollController _logScrollController = ScrollController();
+
+  // Power Strike
+  final _shakeKey = GlobalKey<ShakeWidgetState>();
+  DateTime? _lastPowerStrike;
+  static const int _powerStrikeCooldownSec = 10;
+
+  bool get _canPowerStrike {
+    if (_monster == null) return false;
+    if (_lastPowerStrike == null) return true;
+    return DateTime.now().difference(_lastPowerStrike!).inSeconds >=
+        _powerStrikeCooldownSec;
+  }
+
+  void _performPowerStrike(GameState gs) {
+    if (!_canPowerStrike) return;
+
+    setState(() {
+      _lastPowerStrike = DateTime.now();
+    });
+
+    final damage = (_calcPlayerDamage(gs) * 1.5).round();
+    final monDefense = _monster!.defense;
+    final finalDamage = _reduceByDefense(damage, monDefense);
+
+    _log(
+      'Power Strike! hit ${_monster!.name} for $finalDamage!',
+      Colors.orangeAccent,
+    );
+
+    // Float
+    _floats.add(
+      _DamageFloat(
+        text: '$finalDamage (Power!)',
+        color: Colors.orange,
+        start: DateTime.now(),
+        duration: const Duration(milliseconds: 1000),
+        xFrac: 0.5,
+        yFrac: 0.3,
+        rise: 50,
+      ),
+    );
+
+    setState(() {
+      _monster = _monster!.hit(finalDamage);
+    });
+
+    // Reset player attack timer to give instant gratification (attack now, then wait usual interval)
+    _nextPlayerHit = DateTime.now().add(
+      Duration(milliseconds: _playerIntervalMs),
+    );
+
+    if (_monster!.hp <= 0) {
+      _onMonsterDefeated(gs);
+    }
+  }
+
+  void _log(String text, Color color) {
+    setState(() {
+      _logs.add(_LogEntry(text, color));
+      // Keep only last 50
+      if (_logs.length > 50) _logs.removeAt(0);
+    });
+    // Scroll to bottom
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_logScrollController.hasClients) {
+        _logScrollController.animateTo(
+          _logScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -177,8 +280,14 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     const baseStaminaCost = 5;
     const hpPenaltyWhenExhausted = 2;
     // Apply stamina cost reduction from items (percentage)
-    final reduction = _sumStat(gs, ItemStatType.staminaCostReduction).clamp(0.0, 0.9);
-    final staminaCost = (baseStaminaCost * (1.0 - reduction)).round().clamp(1, baseStaminaCost);
+    final reduction = _sumStat(
+      gs,
+      ItemStatType.staminaCostReduction,
+    ).clamp(0.0, 0.9);
+    final staminaCost = (baseStaminaCost * (1.0 - reduction)).round().clamp(
+      1,
+      baseStaminaCost,
+    );
     final currentStamina = gs.profile.stamina;
 
     if (currentStamina >= staminaCost) {
@@ -195,13 +304,13 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
       }
     }
     // Move forward when no monster is present.
-        setState(() {
-          _step += 1;
-          // 35% chance to encounter a monster.
-          if (_rnd.nextDouble() < 0.35) {
-            _monster = Monster.randomForStep(gs, _step, _rnd);
-            _startCombat(gs);
-          } else if (_rnd.nextDouble() < 0.10) {
+    setState(() {
+      _step += 1;
+      // 35% chance to encounter a monster.
+      if (_rnd.nextDouble() < 0.35) {
+        _monster = Monster.randomForStep(gs, _step, _rnd);
+        _startCombat(gs);
+      } else if (_rnd.nextDouble() < 0.10) {
         var restorePoints = 10 + (_step ~/ 10);
         gs.loseHealth(-restorePoints);
         OverlayService.showToast('Restored $restorePoints health!');
@@ -233,20 +342,26 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
         return;
       }
       final now = DateTime.now();
-        // Safety: if somehow monster HP already 0, end immediately
-        if (_monster!.hp <= 0) {
-          _onMonsterDefeated(gs);
-          return;
-        }
+      // Safety: if somehow monster HP already 0, end immediately
+      if (_monster!.hp <= 0) {
+        _onMonsterDefeated(gs);
+        return;
+      }
       if (_nextPlayerHit != null && now.isAfter(_nextPlayerHit!)) {
         // Accuracy check
-        final hitChance = (0.8 + _sumStat(gs, ItemStatType.accuracy)).clamp(0.1, 0.98);
+        final hitChance = (0.8 + _sumStat(gs, ItemStatType.accuracy)).clamp(
+          0.1,
+          0.98,
+        );
         final hit = _rnd.nextDouble() < hitChance;
         _nextPlayerHit = now.add(Duration(milliseconds: _playerIntervalMs));
         if (hit) {
           var damage = _calcPlayerDamage(gs);
           // Crit roll
-          final critChance = _sumStat(gs, ItemStatType.critChance).clamp(0.0, 0.95);
+          final critChance = _sumStat(
+            gs,
+            ItemStatType.critChance,
+          ).clamp(0.0, 0.95);
           final critMult = 1.0 + _sumStat(gs, ItemStatType.critDamage);
           final isCrit = _rnd.nextDouble() < critChance;
           if (isCrit) {
@@ -254,18 +369,30 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           }
           // Spawn damage float over monster
           final fx = 0.5 + (_rnd.nextDouble() - 0.5) * 0.18;
-          _floats.add(_DamageFloat(
-            text: isCrit ? '-$damage!' : '-$damage',
-            color: isCrit ? Colors.yellowAccent : Colors.greenAccent,
-            start: now,
-            duration: const Duration(milliseconds: 800),
-            xFrac: fx,
-            yFrac: 0.24,
-            rise: isCrit ? 44 : 36,
-          ));
+          _floats.add(
+            _DamageFloat(
+              text: isCrit ? '-$damage!' : '-$damage',
+              color: isCrit ? Colors.yellowAccent : Colors.greenAccent,
+              start: now,
+              duration: const Duration(milliseconds: 800),
+              xFrac: fx,
+              yFrac: 0.24,
+              rise: isCrit ? 44 : 36,
+            ),
+          );
           // Reduce by monster defense
           final monDefense = _monster!.defense;
           final finalDamage = _reduceByDefense(damage, monDefense);
+
+          if (isCrit) {
+            _log(
+              'Criticsl hit on ${_monster!.name} for $finalDamage!',
+              Colors.yellowAccent,
+            );
+          } else {
+            _log('Hit ${_monster!.name} for $finalDamage.', Colors.greenAccent);
+          }
+
           setState(() {
             _monster = _monster!.hit(finalDamage);
           });
@@ -276,15 +403,18 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
         } else {
           // Miss float
           final fx = 0.5 + (_rnd.nextDouble() - 0.5) * 0.18;
-          _floats.add(_DamageFloat(
-            text: 'miss',
-            color: Colors.white,
-            start: now,
-            duration: const Duration(milliseconds: 600),
-            xFrac: fx,
-            yFrac: 0.24,
-            rise: 26,
-          ));
+          _log('You missed ${_monster!.name}.', Colors.white38);
+          _floats.add(
+            _DamageFloat(
+              text: 'miss',
+              color: Colors.white,
+              start: now,
+              duration: const Duration(milliseconds: 600),
+              xFrac: fx,
+              yFrac: 0.24,
+              rise: 26,
+            ),
+          );
         }
       }
       if (_nextMonsterHit != null && now.isAfter(_nextMonsterHit!)) {
@@ -298,9 +428,9 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           int raw = 2 + (_step ~/ 5) + _rnd.nextInt(3);
           if (_monster!.type == MonsterType.slime) {
             // Higher tier slimes hit harder (less reduction)
-            final base = gs.cfgNum(['slime','damage_factor','base'], 0.7);
-            final per = gs.cfgNum(['slime','damage_factor','per_tier'], 0.05);
-            final maxF = gs.cfgNum(['slime','damage_factor','max'], 0.95);
+            final base = gs.cfgNum(['slime', 'damage_factor', 'base'], 0.7);
+            final per = gs.cfgNum(['slime', 'damage_factor', 'per_tier'], 0.05);
+            final maxF = gs.cfgNum(['slime', 'damage_factor', 'max'], 0.95);
             final factor = (base + per * _monster!.tier).clamp(base, maxF);
             raw = max(1, (raw * factor).round());
           }
@@ -308,60 +438,107 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           final dmg = _reduceByDefense(raw, defense);
           // Spawn damage float near player HUD
           final fx = 0.15 + (_rnd.nextDouble() - 0.5) * 0.12;
-          _floats.add(_DamageFloat(
-            text: '-$dmg',
-            color: Colors.redAccent,
-            start: now,
-            duration: const Duration(milliseconds: 800),
-            xFrac: fx,
-            yFrac: 0.08,
-            rise: 30,
-          ));
+          _floats.add(
+            _DamageFloat(
+              text: '-$dmg',
+              color: Colors.redAccent,
+              start: now,
+              duration: const Duration(milliseconds: 800),
+              xFrac: fx,
+              yFrac: 0.08,
+              rise: 30,
+            ),
+          );
           gs.loseHealth(dmg);
+          _log('${_monster!.name} hit you for $dmg.', Colors.redAccent);
+          _shakeKey.currentState?.shake();
           if (_monster!.type == MonsterType.spider) {
             final t = _monster!.tier;
-            final baseTicks = gs.cfgInt(['spider','poison','ticks_base'], 5);
-            final ticksPer = gs.cfgInt(['spider','poison','ticks_per_tier'], 1);
-            final dmgBase = gs.cfgInt(['spider','poison','damage_base'], 2);
-            final dmgPer = gs.cfgInt(['spider','poison','damage_per_tier'], 1);
-            final intBase = gs.cfgInt(['spider','poison','interval_base_ms'], 1000);
-            final intDelta = gs.cfgInt(['spider','poison','interval_delta_per_tier'], -50);
-            final intMin = gs.cfgInt(['spider','poison','interval_min_ms'], 600);
+            final baseTicks = gs.cfgInt(['spider', 'poison', 'ticks_base'], 5);
+            final ticksPer = gs.cfgInt([
+              'spider',
+              'poison',
+              'ticks_per_tier',
+            ], 1);
+            final dmgBase = gs.cfgInt(['spider', 'poison', 'damage_base'], 2);
+            final dmgPer = gs.cfgInt([
+              'spider',
+              'poison',
+              'damage_per_tier',
+            ], 1);
+            final intBase = gs.cfgInt([
+              'spider',
+              'poison',
+              'interval_base_ms',
+            ], 1000);
+            final intDelta = gs.cfgInt([
+              'spider',
+              'poison',
+              'interval_delta_per_tier',
+            ], -50);
+            final intMin = gs.cfgInt([
+              'spider',
+              'poison',
+              'interval_min_ms',
+            ], 600);
             final ticks = baseTicks + t * ticksPer;
             final perTick = dmgBase + t * dmgPer;
-            final int interval = max(intMin, min(2000, intBase + t * intDelta)).toInt();
-            _applyPoison(ticks: ticks, damagePerTick: perTick, intervalMs: interval);
+            final int interval =
+                max(intMin, min(2000, intBase + t * intDelta)).toInt();
+            _applyPoison(
+              ticks: ticks,
+              damagePerTick: perTick,
+              intervalMs: interval,
+            );
             final fx2 = 0.15 + (_rnd.nextDouble() - 0.5) * 0.12;
-            _floats.add(_DamageFloat(
-              text: 'poisoned',
-              color: Colors.lightGreenAccent,
-              start: now,
-              duration: const Duration(milliseconds: 700),
-              xFrac: fx2,
-              yFrac: 0.08,
-              rise: 18,
-            ));
+            _floats.add(
+              _DamageFloat(
+                text: 'poisoned',
+                color: Colors.lightGreenAccent,
+                start: now,
+                duration: const Duration(milliseconds: 700),
+                xFrac: fx2,
+                yFrac: 0.08,
+                rise: 18,
+              ),
+            );
           }
           // Wolf: chance for a rapid second claw at higher tiers
           if (_monster!.type == MonsterType.wolf) {
-            final base = gs.cfgNum(['wolf','extra_claw','base_chance'], 0.2);
-            final per = gs.cfgNum(['wolf','extra_claw','chance_per_tier'], 0.1);
-            final maxChance = gs.cfgNum(['wolf','extra_claw','max_chance'], 0.6);
-            final dmgFactor = gs.cfgNum(['wolf','extra_claw','damage_factor'], 0.5);
+            final base = gs.cfgNum(['wolf', 'extra_claw', 'base_chance'], 0.2);
+            final per = gs.cfgNum([
+              'wolf',
+              'extra_claw',
+              'chance_per_tier',
+            ], 0.1);
+            final maxChance = gs.cfgNum([
+              'wolf',
+              'extra_claw',
+              'max_chance',
+            ], 0.6);
+            final dmgFactor = gs.cfgNum([
+              'wolf',
+              'extra_claw',
+              'damage_factor',
+            ], 0.5);
             final chance = (base + per * _monster!.tier).clamp(base, maxChance);
             if (_rnd.nextDouble() < chance) {
               final extra = max(1, (dmg * dmgFactor).round());
               final fx3 = 0.18 + (_rnd.nextDouble() - 0.5) * 0.12;
-              _floats.add(_DamageFloat(
-                text: '-$extra',
-                color: Colors.redAccent,
-                start: now,
-                duration: const Duration(milliseconds: 600),
-                xFrac: fx3,
-                yFrac: 0.1,
-                rise: 16,
-              ));
+              _floats.add(
+                _DamageFloat(
+                  text: '-$extra',
+                  color: Colors.redAccent,
+                  start: now,
+                  duration: const Duration(milliseconds: 600),
+                  xFrac: fx3,
+                  yFrac: 0.1,
+                  rise: 16,
+                ),
+              );
               gs.loseHealth(extra);
+              _log('Wolf double claw hit for $extra!', Colors.redAccent);
+              _shakeKey.currentState?.shake();
             }
           }
           // // Bandit: steals coins at higher tiers
@@ -384,32 +561,41 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
         } else {
           // Player evaded
           final fx = 0.15 + (_rnd.nextDouble() - 0.5) * 0.12;
-          _floats.add(_DamageFloat(
-            text: 'evade',
-            color: Colors.white,
-            start: now,
-            duration: const Duration(milliseconds: 600),
-            xFrac: fx,
-            yFrac: 0.08,
-            rise: 20,
-          ));
+          _log('You evaded ${_monster!.name} attack.', Colors.lightBlueAccent);
+          _floats.add(
+            _DamageFloat(
+              text: 'evade',
+              color: Colors.white,
+              start: now,
+              duration: const Duration(milliseconds: 600),
+              xFrac: fx,
+              yFrac: 0.08,
+              rise: 20,
+            ),
+          );
         }
       }
       // Poison damage over time on player
-      if (_poisonTicksRemaining > 0 && _nextPoisonTick != null && now.isAfter(_nextPoisonTick!)) {
+      if (_poisonTicksRemaining > 0 &&
+          _nextPoisonTick != null &&
+          now.isAfter(_nextPoisonTick!)) {
         _nextPoisonTick = now.add(Duration(milliseconds: _poisonIntervalMs));
         final pdmg = max(1, _poisonDamagePerTick);
         final fx = 0.15 + (_rnd.nextDouble() - 0.5) * 0.12;
-        _floats.add(_DamageFloat(
-          text: '-$pdmg',
-          color: Colors.lightGreenAccent,
-          start: now,
-          duration: const Duration(milliseconds: 800),
-          xFrac: fx,
-          yFrac: 0.08,
-          rise: 20,
-        ));
+        _floats.add(
+          _DamageFloat(
+            text: '-$pdmg',
+            color: Colors.lightGreenAccent,
+            start: now,
+            duration: const Duration(milliseconds: 800),
+            xFrac: fx,
+            yFrac: 0.08,
+            rise: 20,
+          ),
+        );
         gs.loseHealth(pdmg);
+        _log('Poison deals $pdmg damage.', Colors.purpleAccent);
+        _shakeKey.currentState?.shake();
         _poisonTicksRemaining -= 1;
         if (gs.profile.health <= 0) {
           context.read<GameState>().setCombatActive(false);
@@ -477,15 +663,20 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     return max(1, reduced);
   }
 
-  void _applyPoison({required int ticks, required int damagePerTick, int intervalMs = 1000}) {
+  void _applyPoison({
+    required int ticks,
+    required int damagePerTick,
+    int intervalMs = 1000,
+  }) {
     // Stack up to a reasonable cap to avoid infinite growth
     _poisonTicksRemaining = (_poisonTicksRemaining + ticks).clamp(0, 15);
     _poisonDamagePerTick = damagePerTick;
     _poisonIntervalMs = intervalMs;
     final now = DateTime.now();
-    _nextPoisonTick = (_nextPoisonTick == null || now.isAfter(_nextPoisonTick!))
-        ? now.add(Duration(milliseconds: _poisonIntervalMs))
-        : _nextPoisonTick;
+    _nextPoisonTick =
+        (_nextPoisonTick == null || now.isAfter(_nextPoisonTick!))
+            ? now.add(Duration(milliseconds: _poisonIntervalMs))
+            : _nextPoisonTick;
   }
 
   double _progressTo(DateTime? next, int intervalMs) {
@@ -504,7 +695,9 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     final coins = _coinsForKill();
     if (coins > 0) {
       gs.addCoins(coins);
-      OverlayService.showToast('+$coins coins');//TODO: now its displayed in middle of item drop popup
+      OverlayService.showToast(
+        '+$coins coins',
+      ); //TODO: now its displayed in middle of item drop popup
     }
     final drop = gs.maybeDrop(runScore: _step);
     setState(() => _monster = null);
@@ -514,7 +707,8 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => ItemDropPopup(item: drop, onEquip: () => gs.equip(drop)),
+        builder:
+            (_) => ItemDropPopup(item: drop, onEquip: () => gs.equip(drop)),
       );
     } else {
       final msg = gs.applyTemporaryBlessing();
@@ -528,19 +722,20 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        title: const Text('Defeated'),
-        content: Text('You were defeated on step $_step.'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // close dialog
-              Navigator.of(context).pop(); // leave battle page
-            },
-            child: const Text('OK'),
+      builder:
+          (_) => AlertDialog(
+            title: const Text('Defeated'),
+            content: Text('You were defeated on step $_step.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // close dialog
+                  Navigator.of(context).pop(); // leave battle page
+                },
+                child: const Text('OK'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -551,29 +746,52 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
       context: context,
       showDragHandle: true,
       backgroundColor: Colors.black87,
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: const [
-                Icon(Icons.auto_awesome, color: Colors.amberAccent),
-                SizedBox(width: 8),
-                Text('Blessing of Vigor', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+      builder:
+          (_) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.auto_awesome, color: Colors.amberAccent),
+                    SizedBox(width: 8),
+                    Text(
+                      'Blessing of Vigor',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Time remaining: ${gs.blessRemainingSeconds}s',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Effects:',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '• Attack Speed +$spdPct%',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                Text(
+                  '• Stamina Regen +$regPct%',
+                  style: const TextStyle(color: Colors.white70),
+                ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text('Time remaining: ${gs.blessRemainingSeconds}s', style: const TextStyle(color: Colors.white70)),
-            const SizedBox(height: 8),
-            Text('Effects:', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text('• Attack Speed +$spdPct%', style: const TextStyle(color: Colors.white70)),
-            Text('• Stamina Regen +$regPct%', style: const TextStyle(color: Colors.white70)),
-          ],
-        ),
-      ),
+          ),
     );
   }
 
@@ -610,7 +828,6 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     super.dispose();
   }
 
-
   @override
   Widget build(BuildContext context) {
     final gs = context.watch<GameState>();
@@ -642,196 +859,308 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
             ),
           ],
         ),
-        body: Stack(
-        children: [
-          // Background path image (using existing asset for now)
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/backgrounds/battle_bg.png',
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stack) => Container(color: Colors.black),
-            ),
-          ),
-          // HUDs (top and enemy) stacked vertically in SafeArea so enemy HUD starts under HP/Stamina HUD
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Panel(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
+        body: ShakeWidget(
+          key: _shakeKey,
+          child: Stack(
+            children: [
+              // Background path image (using existing asset for now)
+              Positioned.fill(
+                child: Image.asset(
+                  'assets/images/backgrounds/battle_bg.png',
+                  fit: BoxFit.cover,
+                  errorBuilder:
+                      (context, error, stack) => Container(color: Colors.black),
+                ),
+              ),
+              // HUDs (top and enemy) stacked vertically in SafeArea so enemy HUD starts under HP/Stamina HUD
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Panel(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Step: $_step', style: const TextStyle(color: Colors.white)),
-                            const SizedBox(width: 12),
-                            const Icon(Icons.monetization_on, color: Colors.amber, size: 18),
-                            const SizedBox(width: 4),
-                            Text('${p.coins}', style: const TextStyle(color: Colors.white)),
-                          ],
-                        ),
-                        if (gs.isBlessActive)
-                          InkWell(
-                            borderRadius: BorderRadius.circular(6),
-                            onTap: () => _showBlessingInfo(context, gs),
-                            child: Row(
+                            Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.auto_awesome, color: Colors.amberAccent, size: 16),
+                                Text(
+                                  'Step: $_step',
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                                const SizedBox(width: 12),
+                                const Icon(
+                                  Icons.monetization_on,
+                                  color: Colors.amber,
+                                  size: 18,
+                                ),
                                 const SizedBox(width: 4),
-                                Text('Bless ${gs.blessRemainingSeconds}s', style: const TextStyle(color: Colors.white)),
+                                Text(
+                                  '${p.coins}',
+                                  style: const TextStyle(color: Colors.white),
+                                ),
                               ],
                             ),
-                          ),
-                        SizedBox(
-                          width: 180,
+                            if (gs.isBlessActive)
+                              InkWell(
+                                borderRadius: BorderRadius.circular(6),
+                                onTap: () => _showBlessingInfo(context, gs),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.auto_awesome,
+                                      color: Colors.amberAccent,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Bless ${gs.blessRemainingSeconds}s',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            SizedBox(
+                              width: 180,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  StatBar(
+                                    label: 'HP',
+                                    value: p.health,
+                                    max: p.maxHealth,
+                                    color: Colors.red,
+                                    icon: Icons.favorite,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  StatBar(
+                                    label: 'Stamina',
+                                    value: p.stamina,
+                                    max: p.maxStamina,
+                                    color: Colors.green,
+                                    icon: Icons.bolt,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_monster != null) ...[
+                        const SizedBox(height: 12),
+                        Panel(
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              StatBar(label: 'HP', value: p.health, max: p.maxHealth, color: Colors.red, icon: Icons.favorite),
+                              Text(
+                                _monster!.name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: 96,
+                                height: 96,
+                                child: Image.asset(
+                                  _monster!.imageAsset,
+                                  fit: BoxFit.contain,
+                                  errorBuilder:
+                                      (c, e, s) => const Icon(
+                                        Icons.pest_control,
+                                        color: Colors.white54,
+                                        size: 64,
+                                      ),
+                                ),
+                              ),
                               const SizedBox(height: 6),
-                              StatBar(label: 'Stamina', value: p.stamina, max: p.maxStamina, color: Colors.green, icon: Icons.bolt),
+                              _MonsterHpBar(
+                                current: _monster!.hp,
+                                max: _monster!.maxHp,
+                              ),
+                              const SizedBox(height: 8),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24.0,
+                                ),
+                                child: Column(
+                                  children: [
+                                    _AttackProgressBar(
+                                      label: 'You',
+                                      value: _progressTo(
+                                        _nextPlayerHit,
+                                        _playerIntervalMs,
+                                      ),
+                                      color: Colors.green,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    _AttackProgressBar(
+                                      label: _monster!.name,
+                                      value: _progressTo(
+                                        _nextMonsterHit,
+                                        _monsterIntervalMs,
+                                      ),
+                                      color: Colors.redAccent,
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
                         ),
                       ],
+                      Expanded(
+                        child: _BattleLogList(
+                          logs: _logs,
+                          controller: _logScrollController,
+                        ),
+                      ),
+                      const SizedBox(height: 140),
+                    ],
+                  ),
+                ),
+              ),
+              // Floating damage numbers overlay
+              if (_floats.isNotEmpty)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Stack(
+                      children:
+                          _floats.map((f) {
+                            final align = Alignment(
+                              f.xFrac * 2 - 1,
+                              f.yFrac * 2 - 1,
+                            );
+                            final now = DateTime.now();
+                            final p = (now.difference(f.start).inMilliseconds /
+                                    f.duration.inMilliseconds)
+                                .clamp(0.0, 1.0);
+                            final dy = -f.rise * p;
+                            final opacity = 1 - p;
+                            return Align(
+                              alignment: align,
+                              child: Opacity(
+                                opacity: opacity,
+                                child: Transform.translate(
+                                  offset: Offset(0, dy),
+                                  child: Text(
+                                    f.text,
+                                    style: TextStyle(
+                                      color: f.color,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      shadows: const [
+                                        Shadow(
+                                          blurRadius: 4,
+                                          color: Colors.black,
+                                          offset: Offset(1, 1),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
                     ),
                   ),
-                  if (_monster != null) ...[
-                    const SizedBox(height: 12),
-                    Panel(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _monster!.name,
-                            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
+                ),
+              // Bottom inventory + advance button
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: SafeArea(
+                  minimum: const EdgeInsets.only(
+                    bottom: 12,
+                    left: 12,
+                    right: 12,
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _InventoryBar(),
+                        const SizedBox(height: 8),
+                        if (gs.profile.health <= 0)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: null,
+                                  child: const Text('Advance'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: _requestLeave,
+                                  child: const Text('Leave'),
+                                ),
+                              ),
+                            ],
+                          )
+                        else
                           SizedBox(
-                            width: 96,
-                            height: 96,
-                            child: Image.asset(
-                              _monster!.imageAsset,
-                              fit: BoxFit.contain,
-                              errorBuilder: (c, e, s) => const Icon(Icons.pest_control, color: Colors.white54, size: 64),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          _MonsterHpBar(current: _monster!.hp, max: _monster!.maxHp),
-                          const SizedBox(height: 8),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                            child: Column(
+                            width: double.infinity,
+                            child: Row(
                               children: [
-                                _AttackProgressBar(
-                                  label: 'You',
-                                  value: _progressTo(_nextPlayerHit, _playerIntervalMs),
-                                  color: Colors.green,
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed:
+                                        _monster == null
+                                            ? () => _advance(gs)
+                                            : null,
+                                    child: Text(
+                                      _monster == null
+                                          ? 'Advance'
+                                          : 'Fighting...',
+                                    ),
+                                  ),
                                 ),
-                                const SizedBox(height: 6),
-                                _AttackProgressBar(
-                                  label: _monster!.name,
-                                  value: _progressTo(_nextMonsterHit, _monsterIntervalMs),
-                                  color: Colors.redAccent,
-                                ),
+                                if (_monster != null) ...[
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.orange,
+                                        foregroundColor: Colors.black,
+                                      ),
+                                      onPressed:
+                                          _canPowerStrike
+                                              ? () => _performPowerStrike(gs)
+                                              : null,
+                                      child:
+                                          _canPowerStrike
+                                              ? const Text('Power Strike')
+                                              : Text(
+                                                '${(_powerStrikeCooldownSec - DateTime.now().difference(_lastPowerStrike!).inSeconds)}s',
+                                              ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          // Floating damage numbers overlay
-          if (_floats.isNotEmpty)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: Stack(
-                  children: _floats.map((f) {
-                    final align = Alignment(f.xFrac * 2 - 1, f.yFrac * 2 - 1);
-                    final now = DateTime.now();
-                    final p = (now.difference(f.start).inMilliseconds / f.duration.inMilliseconds).clamp(0.0, 1.0);
-                    final dy = -f.rise * p;
-                    final opacity = 1 - p;
-                    return Align(
-                      alignment: align,
-                      child: Opacity(
-                        opacity: opacity,
-                        child: Transform.translate(
-                          offset: Offset(0, dy),
-                          child: Text(
-                            f.text,
-                            style: TextStyle(
-                              color: f.color,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              shadows: const [Shadow(blurRadius: 4, color: Colors.black, offset: Offset(1, 1))],
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
-          // Bottom inventory + advance button
-          Align(
-            alignment: Alignment.bottomCenter,
-child: SafeArea(
-              minimum: const EdgeInsets.only(bottom: 12, left: 12, right: 12),
-              child: Container(
-                decoration: BoxDecoration(
-color: Colors.black.withOpacity(0.6),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white24),
-                ),
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _InventoryBar(),
-                  const SizedBox(height: 8),
-                  if (gs.profile.health <= 0)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: null,
-                            child: const Text('Advance'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _requestLeave,
-                            child: const Text('Leave'),
-                          ),
-                        ),
                       ],
-                    )
-                  else
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _monster == null ? () => _advance(gs) : null,
-                        child: Text(_monster == null ? 'Advance' : 'Fighting...'),
-                      ),
                     ),
-                ],
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-          ),
-        ],
         ),
       ),
     );
@@ -864,19 +1193,45 @@ class _InventoryBar extends StatelessWidget {
     String label;
     bool percent = false;
     switch (t) {
-      case ItemStatType.attack: label = 'Attack'; break;
-      case ItemStatType.defense: label = 'Defense'; break;
-      case ItemStatType.accuracy: label = 'Accuracy'; percent = true; break;
-      case ItemStatType.agility: label = 'Agility'; break;
-      case ItemStatType.critChance: label = 'Crit Chance'; percent = true; break;
-      case ItemStatType.critDamage: label = 'Crit Damage'; percent = true; break;
-      case ItemStatType.health: label = 'Health'; break;
-      case ItemStatType.evasion: label = 'Evasion'; percent = true; break;
-      case ItemStatType.stamina: label = 'Stamina'; break;
-      case ItemStatType.staminaCostReduction: label = 'Stamina Cost Reduction'; percent = true; break;
+      case ItemStatType.attack:
+        label = 'Attack';
+        break;
+      case ItemStatType.defense:
+        label = 'Defense';
+        break;
+      case ItemStatType.accuracy:
+        label = 'Accuracy';
+        percent = true;
+        break;
+      case ItemStatType.agility:
+        label = 'Agility';
+        break;
+      case ItemStatType.critChance:
+        label = 'Crit Chance';
+        percent = true;
+        break;
+      case ItemStatType.critDamage:
+        label = 'Crit Damage';
+        percent = true;
+        break;
+      case ItemStatType.health:
+        label = 'Health';
+        break;
+      case ItemStatType.evasion:
+        label = 'Evasion';
+        percent = true;
+        break;
+      case ItemStatType.stamina:
+        label = 'Stamina';
+        break;
+      case ItemStatType.staminaCostReduction:
+        label = 'Stamina Cost Reduction';
+        percent = true;
+        break;
     }
-    return percent ? '$label +${(v * 100).toStringAsFixed(0)}%'
-                   : '$label +${v.toStringAsFixed(v % 1 == 0 ? 0 : 1)}';
+    return percent
+        ? '$label +${(v * 100).toStringAsFixed(0)}%'
+        : '$label +${v.toStringAsFixed(v % 1 == 0 ? 0 : 1)}';
   }
 
   void _showItemDetails(BuildContext context, String label, Item item) {
@@ -889,10 +1244,18 @@ class _InventoryBar extends StatelessWidget {
         final extras = item.stats.entries.toList();
         String base;
         switch (item.type) {
-          case ItemType.weapon: base = 'Attack +${item.power}'; break;
-          case ItemType.armor: base = 'Defense +${item.power}'; break;
-          case ItemType.ring: base = 'Accuracy +${item.power}'; break;
-          case ItemType.boots: base = 'Defense +${item.power}'; break;
+          case ItemType.weapon:
+            base = 'Attack +${item.power}';
+            break;
+          case ItemType.armor:
+            base = 'Defense +${item.power}';
+            break;
+          case ItemType.ring:
+            base = 'Accuracy +${item.power}';
+            break;
+          case ItemType.boots:
+            base = 'Defense +${item.power}';
+            break;
         }
         return Padding(
           padding: const EdgeInsets.all(16),
@@ -905,21 +1268,45 @@ class _InventoryBar extends StatelessWidget {
                   SizedBox(
                     width: 40,
                     height: 40,
-                    child: Image.asset(_assetForItem(item), fit: BoxFit.contain,
-                      errorBuilder: (c, e, s) => Icon(Icons.inventory_2, color: color)),
+                    child: Image.asset(
+                      _assetForItem(item),
+                      fit: BoxFit.contain,
+                      errorBuilder:
+                          (c, e, s) => Icon(Icons.inventory_2, color: color),
+                    ),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(child: Text(item.name, style: TextStyle(color: color, fontWeight: FontWeight.bold))),
+                  Expanded(
+                    child: Text(
+                      item.name,
+                      style: TextStyle(
+                        color: color,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
-              Text('$label — $base', style: const TextStyle(color: Colors.white70)),
+              Text(
+                '$label — $base',
+                style: const TextStyle(color: Colors.white70),
+              ),
               if (extras.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                const Text('Additional Stats', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                const Text(
+                  'Additional Stats',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 for (final e in extras)
-                  Text('• ${_statLine(e.key, e.value)}', style: const TextStyle(color: Colors.white70)),
+                  Text(
+                    '• ${_statLine(e.key, e.value)}',
+                    style: const TextStyle(color: Colors.white70),
+                  ),
               ],
               const SizedBox(height: 8),
             ],
@@ -933,40 +1320,50 @@ class _InventoryBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.watch<GameState>().profile;
 
-Widget cell(String label, Item? item) => Expanded(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
+    Widget cell(String label, Item? item) => Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap:
+              item == null
+                  ? null
+                  : () => _showItemDetails(context, label, item),
+          child: Container(
+            height: 90,
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.5),
               borderRadius: BorderRadius.circular(8),
-              onTap: item == null ? null : () => _showItemDetails(context, label, item),
-              child: Container(
-                height: 90,
-                decoration: BoxDecoration(
-color: Colors.black.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: _rarityColor(item?.rarity)),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                alignment: Alignment.center,
-                child: item == null
+              border: Border.all(color: _rarityColor(item?.rarity)),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            alignment: Alignment.center,
+            child:
+                item == null
                     ? const SizedBox.shrink()
                     : Tooltip(
-                        message: item.stats.entries.map((e) => _statLine(e.key, e.value)).join('\n'),
-                        preferBelow: false,
-                        child: SizedBox(
-                          width: 60,
-                          height: 60,
-                          child: Image.asset(
-                            _assetForItem(item),
-                            fit: BoxFit.contain,
-                            errorBuilder: (c, e, s) => Icon(Icons.inventory_2, color: _rarityColor(item.rarity)),
-                          ),
+                      message: item.stats.entries
+                          .map((e) => _statLine(e.key, e.value))
+                          .join('\n'),
+                      preferBelow: false,
+                      child: SizedBox(
+                        width: 60,
+                        height: 60,
+                        child: Image.asset(
+                          _assetForItem(item),
+                          fit: BoxFit.contain,
+                          errorBuilder:
+                              (c, e, s) => Icon(
+                                Icons.inventory_2,
+                                color: _rarityColor(item.rarity),
+                              ),
                         ),
                       ),
-              ),
-            ),
+                    ),
           ),
-        );
+        ),
+      ),
+    );
 
     return Row(
       children: [
@@ -982,9 +1379,12 @@ color: Colors.black.withOpacity(0.5),
   }
 }
 
-
 class _AttackProgressBar extends StatelessWidget {
-  const _AttackProgressBar({required this.label, required this.value, required this.color});
+  const _AttackProgressBar({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
   final String label;
   final double value; // 0..1
   final Color color;
@@ -996,8 +1396,14 @@ class _AttackProgressBar extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-            Text('${(value * 100).toInt()}%', style: const TextStyle(color: Colors.white38, fontSize: 12)),
+            Text(
+              label,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+            Text(
+              '${(value * 100).toInt()}%',
+              style: const TextStyle(color: Colors.white38, fontSize: 12),
+            ),
           ],
         ),
         const SizedBox(height: 2),
@@ -1096,16 +1502,16 @@ class Monster {
   });
 
   Monster hit(int damage) => Monster(
-        name: name,
-        type: type,
-        tier: tier,
-        hp: (hp - damage).clamp(0, maxHp),
-        maxHp: maxHp,
-        attackMs: attackMs,
-        defense: defense,
-        accuracy: accuracy,
-        imageAsset: imageAsset,
-      );
+    name: name,
+    type: type,
+    tier: tier,
+    hp: (hp - damage).clamp(0, maxHp),
+    maxHp: maxHp,
+    attackMs: attackMs,
+    defense: defense,
+    accuracy: accuracy,
+    imageAsset: imageAsset,
+  );
 
   static Monster randomForStep(GameState gs, int step, Random rnd) {
     final maxHp = 12 + (step ~/ 5);
@@ -1141,9 +1547,14 @@ class Monster {
     final spdDiv = gs.cfgNum(['score_weights', 'attack_speed_div'], 400.0);
     final accBias = gs.cfgNum(['score_weights', 'accuracy_bias'], 0.6);
     final accWeight = gs.cfgNum(['score_weights', 'accuracy_weight'], 5.0);
-    final score = (maxHp / hpDiv) + (defense / defDiv) + ((1200 - attackMs) / spdDiv) + ((accuracy - accBias) * accWeight);
+    final score =
+        (maxHp / hpDiv) +
+        (defense / defDiv) +
+        ((1200 - attackMs) / spdDiv) +
+        ((accuracy - accBias) * accWeight);
     // Keep combat tier behavior derived from stats as before
-    final int tierIndex = max(0, min(999, score.isNaN ? 0 : score.floor())).toInt();
+    final int tierIndex =
+        max(0, min(999, score.isNaN ? 0 : score.floor())).toInt();
     // Image variant based on checkpoints of 50 steps: 0.. for [0-49]=0, [50-99]=1, etc.
     final int imageIndex = (step ~/ 50);
     final image = gs.pickEnemyImage(name, difficultyIndex: imageIndex);
@@ -1162,3 +1573,99 @@ class Monster {
   }
 }
 
+class _LogEntry {
+  final String text;
+  final Color color;
+  const _LogEntry(this.text, this.color);
+}
+
+class _BattleLogList extends StatelessWidget {
+  final List<_LogEntry> logs;
+  final ScrollController controller;
+  const _BattleLogList({required this.logs, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    if (logs.isEmpty) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.black45,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: ListView.builder(
+        controller: controller,
+        itemCount: logs.length,
+        itemBuilder: (context, index) {
+          final log = logs[index];
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Text(
+              log.text,
+              style: TextStyle(
+                color: log.color,
+                fontSize: 13,
+                shadows: const [
+                  Shadow(
+                    color: Colors.black,
+                    offset: Offset(1, 1),
+                    blurRadius: 2,
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class ShakeWidget extends StatefulWidget {
+  final Widget child;
+  const ShakeWidget({super.key, required this.child});
+  @override
+  ShakeWidgetState createState() => ShakeWidgetState();
+}
+
+class ShakeWidgetState extends State<ShakeWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed) _controller.reset();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void shake() {
+    _controller.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final v = _controller.value;
+        final offset = sin(v * pi * 8) * 8 * (1 - v);
+        return Transform.translate(offset: Offset(offset, 0), child: child);
+      },
+      child: widget.child,
+    );
+  }
+}

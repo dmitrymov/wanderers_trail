@@ -2,7 +2,6 @@ import 'dart:math';
 
 import 'package:flame/cache.dart';
 import 'package:flame/components.dart';
-import 'package:flame/sprite.dart';
 
 import '../state/game_state.dart';
 import 'difficulty.dart';
@@ -76,6 +75,9 @@ class EnemySpriteComponent extends SpriteComponent {
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    sprite = await _loader.loadByDifficulty(enemyKey: enemyKey, difficulty: difficulty);
+    sprite = await _loader.loadByDifficulty(
+      enemyKey: enemyKey,
+      difficulty: difficulty,
+    );
   }
 }

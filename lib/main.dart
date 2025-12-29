@@ -10,7 +10,6 @@ import 'src/data/repositories/local_game_repository.dart';
 import 'src/data/repositories/firestore_game_repository.dart';
 import 'src/state/game_state.dart';
 import 'src/ui/tabs/battle_tab.dart';
-import 'src/ui/tabs/character_tab.dart';
 import 'src/ui/tabs/pet_tab.dart';
 import 'src/ui/tabs/shop_tab.dart';
 
@@ -26,9 +25,8 @@ Future<void> main() async {
     firestoreReady = false;
   }
 
-  final GameRepository repo = firestoreReady
-      ? FirestoreGameRepository()
-      : LocalGameRepository();
+  final GameRepository repo =
+      firestoreReady ? FirestoreGameRepository() : LocalGameRepository();
 
   runApp(
     MultiProvider(
@@ -86,7 +84,10 @@ class _HomeScaffoldState extends State<HomeScaffold> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.storefront), label: 'Shop'),
           // NavigationDestination(icon: Icon(Icons.person), label: 'Character'),
-          NavigationDestination(icon: Icon(Icons.sports_esports), label: 'Battle'),
+          NavigationDestination(
+            icon: Icon(Icons.sports_esports),
+            label: 'Battle',
+          ),
           NavigationDestination(icon: Icon(Icons.pets), label: 'Pet'),
         ],
       ),

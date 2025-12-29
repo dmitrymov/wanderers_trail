@@ -42,16 +42,21 @@ class GameState extends ChangeNotifier {
   DateTime? _blessUntil;
   double _blessAttackSpeedMul = 1.0; // >1 means faster
   double _blessStaminaRegenMul = 1.0; // >1 means more regen
-  bool get isBlessActive => _blessUntil != null && DateTime.now().isBefore(_blessUntil!);
-  double get attackSpeedMultiplier => isBlessActive ? _blessAttackSpeedMul : 1.0;
-  double get staminaRegenMultiplier => isBlessActive ? _blessStaminaRegenMul : 1.0;
+  bool get isBlessActive =>
+      _blessUntil != null && DateTime.now().isBefore(_blessUntil!);
+  double get attackSpeedMultiplier =>
+      isBlessActive ? _blessAttackSpeedMul : 1.0;
+  double get staminaRegenMultiplier =>
+      isBlessActive ? _blessStaminaRegenMul : 1.0;
   int get blessRemainingSeconds {
     if (!isBlessActive) return 0;
     final secs = _blessUntil!.difference(DateTime.now()).inSeconds;
     return max(0, secs);
   }
 
-  String applyTemporaryBlessing({Duration duration = const Duration(seconds: 30)}) {
+  String applyTemporaryBlessing({
+    Duration duration = const Duration(seconds: 30),
+  }) {
     _blessUntil = DateTime.now().add(duration);
     _blessAttackSpeedMul = 1.15; // +15% attack speed
     _blessStaminaRegenMul = 1.5; // +50% regen
@@ -127,7 +132,8 @@ class GameState extends ChangeNotifier {
       final petBonus = selectedPet?.staminaRegenBonus ?? 0.0;
       // Base 2 stamina per second; +50% when not in combat
       final idleMul = _inCombat ? 1.0 : 1.5;
-      final regen = (2 * (1.0 + petBonus) * idleMul * staminaRegenMultiplier).round();
+      final regen =
+          (2 * (1.0 + petBonus) * idleMul * staminaRegenMultiplier).round();
       final s = (profile.stamina + regen).clamp(0, profile.maxStamina).toInt();
       _profile = profile.copyWith(stamina: s);
       notifyListeners();
@@ -138,7 +144,10 @@ class GameState extends ChangeNotifier {
   Pet? get selectedPet {
     final id = profile.selectedPetId;
     if (id == null) return null;
-    return Pet.starterPets().firstWhere((p) => p.id == id, orElse: () => Pet.starterPets().first);
+    return Pet.starterPets().firstWhere(
+      (p) => p.id == id,
+      orElse: () => Pet.starterPets().first,
+    );
   }
 
   void selectPet(String petId) {
@@ -210,7 +219,8 @@ class GameState extends ChangeNotifier {
     final cost = healthUpgradeCost;
     if (profile.coins < cost) return false;
     final newMax = profile.maxHealth + healthUpgradeStep;
-    final int newHealth = (profile.health + healthUpgradeStep).clamp(0, newMax).toInt();
+    final int newHealth =
+        (profile.health + healthUpgradeStep).clamp(0, newMax).toInt();
     _profile = profile.copyWith(
       maxHealth: newMax,
       health: newHealth,
@@ -226,7 +236,8 @@ class GameState extends ChangeNotifier {
     final cost = staminaUpgradeCost;
     if (profile.coins < cost) return false;
     final newMax = profile.maxStamina + staminaUpgradeStep;
-    final int newStamina = (profile.stamina + staminaUpgradeStep).clamp(0, newMax).toInt();
+    final int newStamina =
+        (profile.stamina + staminaUpgradeStep).clamp(0, newMax).toInt();
     _profile = profile.copyWith(
       maxStamina: newMax,
       stamina: newStamina,
@@ -269,7 +280,8 @@ class GameState extends ChangeNotifier {
   }
 
   void loseHealth(int amount) {
-    final int clamped = (profile.health - amount).clamp(0, profile.maxHealth).toInt();
+    final int clamped =
+        (profile.health - amount).clamp(0, profile.maxHealth).toInt();
     _profile = profile.copyWith(health: clamped);
     notifyListeners();
     _persist();
@@ -297,7 +309,12 @@ class GameState extends ChangeNotifier {
   }
 
   // Compute stats for an arbitrary loadout, including permanent upgrades
-  StatsSummary computeStats({Item? weapon, Item? armor, Item? ring, Item? boots}) {
+  StatsSummary computeStats({
+    Item? weapon,
+    Item? armor,
+    Item? ring,
+    Item? boots,
+  }) {
     final base = StatsSummary.fromItems(
       weapon: weapon,
       armor: armor,
@@ -327,6 +344,7 @@ class GameState extends ChangeNotifier {
     }
     return null;
   }
+
   Future<void> _persist() async {
     try {
       final p = profile;
@@ -353,7 +371,8 @@ class GameState extends ChangeNotifier {
   Future<void> _loadAssetManifest() async {
     try {
       final manifest = await rootBundle.loadString('AssetManifest.json');
-      final Map<String, dynamic> map = jsonDecode(manifest) as Map<String, dynamic>;
+      final Map<String, dynamic> map =
+          jsonDecode(manifest) as Map<String, dynamic>;
       await _loadMonsterConfig();
 
       // Weapons
@@ -372,12 +391,13 @@ class GameState extends ChangeNotifier {
 
       _enemyAssetsByType.clear();
 
-      String _enemyTypeFromPath(String p) {
+      String enemyTypeFromPath(String p) {
         final parts = p.split('/');
         final int idx = parts.indexOf('enemies');
         if (idx < 0) return '';
         // If nested like enemies/<type>/<file>.png prefer folder name
-        if (idx + 2 < parts.length && parts.last.toLowerCase().endsWith('.png')) {
+        if (idx + 2 < parts.length &&
+            parts.last.toLowerCase().endsWith('.png')) {
           return parts[idx + 1].toLowerCase();
         }
         // Otherwise use filename base without trailing digits, e.g. bandit2.png -> bandit
@@ -389,19 +409,20 @@ class GameState extends ChangeNotifier {
       }
 
       for (final p in enemyPaths) {
-        final type = _enemyTypeFromPath(p);
+        final type = enemyTypeFromPath(p);
         if (type.isEmpty) continue;
         _enemyAssetsByType.putIfAbsent(type, () => []).add(p);
       }
 
       // Sort variants by numeric hint in filename/path (ascending). Files without a number are treated as tier 1.
-      int _extractNum(String s) {
+      int extractNum(String s) {
         final m = RegExp(r'(\d+)').firstMatch(s);
         return m == null ? 1 : int.tryParse(m.group(1)!) ?? 1;
       }
+
       for (final e in _enemyAssetsByType.entries) {
         e.value.sort((a, b) {
-          final na = _extractNum(a), nb = _extractNum(b);
+          final na = extractNum(a), nb = extractNum(b);
           if (na != nb) return na.compareTo(nb);
           return a.compareTo(b);
         });
@@ -425,7 +446,10 @@ class GameState extends ChangeNotifier {
       ItemRarity.mystic => '4',
     };
     // Match files that contain '_<rarityDigit><number>.png'
-    final reg = RegExp(r".*/.+?_" + rarityDigit + r"\d+\.png$", caseSensitive: false);
+    final reg = RegExp(
+      r".*/.+?_" + rarityDigit + r"\d+\.png$",
+      caseSensitive: false,
+    );
     final candidates = _weaponAssets.where((p) => reg.hasMatch(p)).toList();
     if (candidates.isEmpty) return null;
     candidates.shuffle();
@@ -504,9 +528,14 @@ class GameState extends ChangeNotifier {
     final a = profile.armor?.id;
     final r = profile.ring?.id;
     final b = profile.boots?.id;
-    final dirty = _statsCache == null ||
-        w != _cacheWeaponId || a != _cacheArmorId || r != _cacheRingId || b != _cacheBootsId ||
-        _cachePermAttackLevel != permAttackLevel || _cachePermDefenseLevel != permDefenseLevel;
+    final dirty =
+        _statsCache == null ||
+        w != _cacheWeaponId ||
+        a != _cacheArmorId ||
+        r != _cacheRingId ||
+        b != _cacheBootsId ||
+        _cachePermAttackLevel != permAttackLevel ||
+        _cachePermDefenseLevel != permDefenseLevel;
     if (dirty) {
       final base = StatsSummary.fromItems(
         weapon: profile.weapon,
