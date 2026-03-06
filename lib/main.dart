@@ -1,3 +1,10 @@
+// App Architecture:
+// The app follows a clean architecture pattern with separation of concerns.
+// - Data Layer: Handles data operations, including local and Firestore storage.
+// - Business Logic Layer: Manages game state and business rules.
+// - UI Layer: Presents the user interface and handles user interactions.
+// - Providers: Used for state management and dependency injection.
+
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
