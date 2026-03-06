@@ -1,97 +1,110 @@
 import os
-os.environ["OPENAI_API_KEY"] = "ollama"
-os.environ["OPENAI_API_BASE"] = "http://localhost:11434/v1"
-os.environ["EMBEDDINGS_OLLAMA_MODEL_NAME"] = "nomic-embed-text"
 import subprocess
-from crewai import Agent, Task, Crew, Process
+from crewai import Agent, Task, Crew, Process, LLM
 from crewai_tools import DirectoryReadTool, FileReadTool, FileWriterTool
 from crewai.tools import BaseTool
 
-# --- PATH CONFIGURATION ---
+# --- 1. GLOBAL OVERRIDES (Stops OpenAI 401 Errors) ---
+os.environ["OPENAI_API_KEY"] = "NA"
+os.environ["OPENAI_API_BASE"] = "http://localhost:11434/v1"
+os.environ["EMBEDDINGS_OLLAMA_MODEL_NAME"] = "nomic-embed-text"
+os.environ["LITELLM_LOCAL_MODEL_TIMEOUT"] = "600"
+
+
+# --- 2. PATH CONFIGURATION ---
 PROJECT_PATH = r'C:\Projects\flutter\wanderers_trail'
 
-class FlutterCheckTool(BaseTool):
-    name: str = "flutter_check_tool"
-    description: str = "Runs flutter analyze to catch syntax errors or dart format to fix styling."
-
-    def _run(self, command: str) -> str:
-        try:
-            if command == "analyze":
-                result = subprocess.run(
-                    ["flutter", "analyze"], 
-                    capture_output=True, text=True, cwd=PROJECT_PATH
-                )
-                return result.stdout if result.returncode == 0 else f"Errors found:\n{result.stdout}"
-            
-            elif command == "format":
-                subprocess.run(["dart", "format", "."], check=True, cwd=PROJECT_PATH)
-                return "Code formatted successfully."
-                
-            return "Unknown command."
-        except Exception as e:
-            return f"Tool Error: {str(e)}"
-
-# Initialize it
-flutter_check_tool = FlutterCheckTool()
-
-# --- CUSTOM GIT TOOL ---
+# --- 3. CUSTOM TOOLS ---
 class GitControlTool(BaseTool):
     name: str = "git_control_tool"
-    description: str = "Tool to manage Git operations: branch creation, add, and commit."
+    description: str = "Manage Git operations: branch creation, switching (checkout), adding files, and committing changes."
+    cache_function: bool = False
 
     def _run(self, command: str, branch_name: str = None, message: str = None) -> str:
+        """
+        Executes git commands in the specified PROJECT_PATH.
+        Supported commands: 'create_branch', 'checkout', 'commit_all'
+        """
+        import subprocess
+        
         try:
-            if command == "create_branch":
-                subprocess.run(["git", "checkout", "-b", branch_name], check=True, cwd=PROJECT_PATH)
-                return f"Branch {branch_name} created and checked out."
-            
+            # 1. CREATE OR SWITCH BRANCH (Handles 'create_branch' and 'checkout' aliases)
+            if command in ["create_branch", "checkout"]:
+                if not branch_name:
+                    return "Error: branch_name is required for this command."
+
+                # Check if the branch already exists locally
+                result = subprocess.run(
+                    ["git", "branch", "--list", branch_name],
+                    capture_output=True, text=True, cwd=PROJECT_PATH, check=True
+                )
+                
+                if branch_name in result.stdout:
+                    # Branch exists, just switch to it
+                    subprocess.run(["git", "checkout", branch_name], 
+                                 capture_output=True, text=True, cwd=PROJECT_PATH, check=True)
+                    return f"Branch '{branch_name}' already exists. Switched to it successfully."
+                else:
+                    # Branch doesn't exist, create and switch
+                    subprocess.run(["git", "checkout", "-b", branch_name], 
+                                 capture_output=True, text=True, cwd=PROJECT_PATH, check=True)
+                    return f"Created and switched to new branch: '{branch_name}'."
+
+            # 2. COMMIT ALL CHANGES
             elif command == "commit_all":
-                subprocess.run(["git", "add", "."], check=True, cwd=PROJECT_PATH)
-                subprocess.run(["git", "commit", "-m", message], check=True, cwd=PROJECT_PATH)
-                return f"Changes committed successfully with message: {message}"
-            
-            return "Command not recognized."
+                if not message:
+                    return "Error: A commit message is required."
+                
+                # Add all changes
+                subprocess.run(["git", "add", "."], cwd=PROJECT_PATH, check=True)
+                
+                # Commit
+                commit_result = subprocess.run(
+                    ["git", "commit", "-m", message],
+                    capture_output=True, text=True, cwd=PROJECT_PATH
+                )
+                
+                if "nothing to commit" in commit_result.stdout:
+                    return "Git Update: Nothing to commit"
+                else:
+                    return f"Git Commit Success: {commit_result.stdout}"
+
+            return "Unknown command provided to GitControlTool."
+
+        except subprocess.CalledProcessError as e:
+            return f"Git Process Error: {e.stderr if e.stderr else str(e)}"
         except Exception as e:
-            return f"Git Error: {str(e)}"
+            return f"Unexpected Error in GitControlTool: {str(e)}"
 
-from crewai import LLM
-
-# --- INITIALIZE TOOLS & MODEL ---
+# --- 4. INITIALIZE LOCAL MODELS & TOOLS ---
+# Using the 'ollama/' prefix tells CrewAI to route through the local server
 local_llm = LLM(
-    model="qwen2.5-coder:14b-instruct",
-    base_url="http://localhost:11434/v1",
-    api_key="ollama"
+    model="ollama/qwen2.5-coder:14b",
+    base_url="http://localhost:11434",
+    temperature=0.1,
+    timeout=600
 )
 
 dir_tool = DirectoryReadTool(directory=PROJECT_PATH)
 file_read_tool = FileReadTool()
-file_write_tool = FileWriterTool()
+file_write_tool = FileWriterTool() 
 git_tool = GitControlTool()
 
-# --- MANAGER DEFINITION ---
-project_manager = Agent(
-    role='Technical Project Manager',
-    goal='Optimize the OpenSop Flutter codebase by identifying and fixing UI/UX debt.',
-    backstory='You are a veteran software architect overseeing the dev lifecycle.',
-    allow_delegation=True,
-    llm=local_llm,
-    verbose=True
-)
-
-# --- AGENT DEFINITIONS ---
+# --- 5. AGENT DEFINITIONS ---
 release_manager = Agent(
     role='Release Manager',
-    goal='Manage project versioning, branches, and clean commits.',
-    backstory='You are a meticulous release engineer. You ensure the repository stays organized and every change is documented.',
+    goal='Manage project versioning and clean commits.',
+    backstory='Meticulous release engineer ensuring repo organization.',
     tools=[git_tool],
     llm=local_llm,
+    max_iter=3,
     verbose=True
 )
 
 ui_analyst = Agent(
     role='Flutter UX/UI Analyst',
-    goal='Analyze Dart code to identify UI inconsistencies and UX improvement opportunities.',
-    backstory='Expert in Flutter Material 3 design systems. You have an eye for padding, typography, and widget composition.',
+    goal='Identify one specific UI improvement in the lib folder.',
+    backstory='Expert in Flutter Material 3. You find padding and alignment issues.',
     tools=[dir_tool, file_read_tool],
     llm=local_llm,
     verbose=True
@@ -99,115 +112,81 @@ ui_analyst = Agent(
 
 flutter_developer = Agent(
     role='Senior Flutter Developer',
-    goal='Modify Dart files to improve UI.',
-    backstory='You are a Dart wizard. IMPORTANT: When using FileWriterTool, you MUST provide the ENTIRE content of the file from the first import to the last bracket. Never write partial snippets.',
+    goal='Apply UI improvements to Dart files.',
+    backstory='You are a pragmatist. If you write a file once, you move on.',
     tools=[file_read_tool, file_write_tool],
     llm=local_llm,
+    max_iter=2,
     verbose=True
 )
 
-qa_engineer = Agent(
-    role='QA Automation Specialist',
-    goal='Verify the integrity of modified code using official Flutter tools.',
-    backstory='You are a stickler for the rules. You use "flutter analyze" to ensure no linting or syntax errors exist.',
-    tools=[file_read_tool, flutter_check_tool], # Added the tool here
-    llm=local_llm,
-    verbose=True
-)
+file_write_tool.cache_function = False
 
-# --- TASK DEFINITIONS ---
+# --- 6. TASK DEFINITIONS ---
 task_git_init = Task(
-    description="Create a new git branch named 'feature/ai-ux-updates' to isolate changes.",
-    expected_output="Branch creation confirmation.",
+    description="Check if the git branch 'feature/ai-ux-updates' is active. If not, switch/create it. "
+                "Once the tool confirms the branch is active, immediately finish and provide the branch name as your Final Answer.",
+    expected_output="The name of the active branch.",
     agent=release_manager
 )
 
 task_analyze_ui = Task(
-    description=(
-        f"Scan the {PROJECT_PATH}/lib directory. Identify a specific UI screen "
-        "that could be improved. You MUST output the full file path and the suggested changes."
-    ),
-    expected_output="The full path of the file to modify and a detailed list of UI improvements.",
+    description=f"Scan the {PROJECT_PATH}/lib directory. Identify ONE specific file and UI improvement.",
+    expected_output="The full file path and a list of specific UI changes.",
     agent=ui_analyst
 )
 
+# task_apply_changes = Task(
+#     description=(
+#         "1. Take the UI Analyst's suggestions.\n"
+#         "2. Rewrite the Dart code for the chosen file.\n"
+#         "3. CRITICAL: You MUST call the 'file_writer_tool' with the FULL content. "
+#         "If you do not call the tool, the task is a failure."
+#     ),
+#     expected_output="Confirmation from the file_writer_tool that the file was saved.",
+#     agent=flutter_developer,
+#     context=[task_analyze_ui]
+# )
+
 task_apply_changes = Task(
     description=(
-        "Based on the UI Analyst's report, modify the chosen Dart file. "
-        "When using FileWriterTool, you MUST provide the complete file content. Never output snippets or placeholders like, use FileWriterTool to overwrite the file with the improved code."
+        "Rewrite the chosen Dart file. If the file is already optimized, "
+        "make a small comment change to verify the write, save it using 'file_writer_tool', "
+        "and immediately provide your Final Answer. Do not repeat the action more than once."
     ),
-    expected_output="The updated Dart source code with applied improvements.",
-    agent=flutter_developer,
-    context=[task_analyze_ui]
-)
-
-task_verify_code = Task(
-    description=(
-        "1. Read the modified Dart file.\n"
-        "2. Run 'flutter_check_tool' with the 'analyze' command.\n"
-        "3. If errors exist, list them. If clean, run 'format' to finalize."
-    ),
-    expected_output="A report confirming 'flutter analyze' passed with no issues.",
-    agent=qa_engineer,
-    context=[task_apply_changes]
+    expected_output="Confirmation that the file was saved or no changes were necessary.",
+    agent=flutter_developer
 )
 
 task_git_commit = Task(
-    description="Commit all changes to the repository with a professional, descriptive commit message in English.",
-    expected_output="Git commit confirmation message.",
+    description="Commit all changes to the repository with a descriptive message.",
+    expected_output="Git commit confirmation.",
     agent=release_manager,
-    context=[task_apply_changes, task_verify_code]
+    context=[task_apply_changes]
 )
 
-# --- DYNAMIC TASK DEFINITIONS ---
-# Note: We removed the 'agent=' parameter; the Manager will assign these.
-
-task_analyze_project = Task(
-    description="Scan the /lib directory and find ONE file that needs UI improvement.",
-    expected_output="The file path and a list of specific UX changes needed."
-)
-
-task_execute_improvement = Task(
-    description="Modify the identified file to implement the improvements.",
-    expected_output="The fully updated Dart code applied to the file."
-)
-
-task_qa_and_format = Task(
-    description="Run 'analyze' and 'format' on the modified code to ensure it's production-ready.",
-    expected_output="A clean report with no syntax errors."
-)
-
-## --- THE HIERARCHICAL CREW ---
-#wanderers_crew = Crew(
-#    agents=[ui_analyst, flutter_developer, qa_engineer], # Workers only
-#    tasks=[task_analyze_project, task_execute_improvement, task_qa_and_format],
-#    process=Process.hierarchical,
-#    manager_agent=project_manager, # The "Boss"
-#    verbose=True
-#)
-
-from crewai import Crew, Process
-
-# --- THE SMART CREW ---
+# --- 7. CREW ASSEMBLY ---
+# --- 7. CREW ASSEMBLY ---
 wanderers_crew = Crew(
-    agents=[ui_analyst, flutter_developer, qa_engineer],
-    tasks=[task_analyze_project, task_execute_improvement, task_qa_and_format],
-    process=Process.hierarchical,
-    manager_agent=project_manager,
-    manager_llm=local_llm,
+    agents=[release_manager, ui_analyst, flutter_developer],
+    tasks=[task_git_init, task_analyze_ui, task_apply_changes, task_git_commit],
+    process=Process.sequential,
+    memory=False,
     verbose=True,
+    manager_llm=local_llm,
     embedder={
         "provider": "ollama",
         "config": {
+            "model": "nomic-embed-text",
             "model_name": "nomic-embed-text",
-            "url": "http://localhost:11434/api/embeddings"
+            "base_url": "http://localhost:11434"
         }
     }
 )
 
-# --- EXECUTION ---
+# --- 8. EXECUTION ---
 if __name__ == "__main__":
-    print(f"### Starting Multi-Agent Workflow for: Wanderers Trail")
+    print(f"### Starting Local Agent Crew for: Wanderers Trail")
     result = wanderers_crew.kickoff()
     print("\n\n########################")
     print("## WORKFLOW COMPLETED ##")
