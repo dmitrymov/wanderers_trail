@@ -1,10 +1,10 @@
 import os
-os.environ["OPENAI_API_KEY"] = "NA"
+os.environ["OPENAI_API_KEY"] = "ollama"
+os.environ["OPENAI_API_BASE"] = "http://localhost:11434/v1"
 os.environ["EMBEDDINGS_OLLAMA_MODEL_NAME"] = "nomic-embed-text"
 import subprocess
 from crewai import Agent, Task, Crew, Process
 from crewai_tools import DirectoryReadTool, FileReadTool, FileWriterTool
-from langchain_ollama import ChatOllama
 from crewai.tools import BaseTool
 
 # --- PATH CONFIGURATION ---
@@ -54,13 +54,13 @@ class GitControlTool(BaseTool):
         except Exception as e:
             return f"Git Error: {str(e)}"
 
-import os
 from crewai import LLM
 
 # --- INITIALIZE TOOLS & MODEL ---
 local_llm = LLM(
-    model="ollama/qwen2.5-coder:14b-instruct",
-    base_url="http://localhost:11434"
+    model="qwen2.5-coder:14b-instruct",
+    base_url="http://localhost:11434/v1",
+    api_key="ollama"
 )
 
 dir_tool = DirectoryReadTool(directory=PROJECT_PATH)
@@ -99,8 +99,8 @@ ui_analyst = Agent(
 
 flutter_developer = Agent(
     role='Senior Flutter Developer',
-    goal='Implement UI/UX improvements by modifying Dart files while maintaining clean code.',
-    backstory='A Dart wizard who writes performant, readable code and follows Flutter best practices.',
+    goal='Modify Dart files to improve UI.',
+    backstory='You are a Dart wizard. IMPORTANT: When using FileWriterTool, you MUST provide the ENTIRE content of the file from the first import to the last bracket. Never write partial snippets.',
     tools=[file_read_tool, file_write_tool],
     llm=local_llm,
     verbose=True
@@ -195,13 +195,12 @@ wanderers_crew = Crew(
     process=Process.hierarchical,
     manager_agent=project_manager,
     manager_llm=local_llm,
-    memory=True,  
     verbose=True,
     embedder={
         "provider": "ollama",
         "config": {
-            "model": "nomic-embed-text",
-            "base_url": "http://localhost:11434" # Ensure this is explicitly here
+            "model_name": "nomic-embed-text",
+            "url": "http://localhost:11434/api/embeddings"
         }
     }
 )
