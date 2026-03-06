@@ -218,13 +218,12 @@ task_commit = Task(
         "The developer has just implemented code changes for this task:\n"
         f"  {USER_TASK}\n\n"
         "Your job:\n"
-        "1. Create or switch to the branch 'feature/ai-coding' using git_control_tool "
-        "with command='create_branch' and branch_name='feature/ai-coding'.\n"
-        "2. Commit all changes using git_control_tool with command='commit_all' and "
-        "a helpful, concise commit message describing what was implemented.\n"
-        "3. Report the result as your Final Answer."
+        "1. Commit all changes to the current branch (main) using git_control_tool "
+        "with command='commit_all' and a concise, professional commit message "
+        "describing what was implemented.\n"
+        "2. Report the commit message and result as your Final Answer."
     ),
-    expected_output="Confirmation of git branch creation and commit with the commit message used.",
+    expected_output="Confirmation of the git commit and the commit message used.",
     agent=release_manager,
     context=[task_implement],
 )
