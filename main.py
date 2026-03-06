@@ -23,6 +23,39 @@ USER_TASK = sys.argv[1]
 PROJECT_PATH = r'C:\Projects\flutter\wanderers_trail'
 LIB_PATH = rf'{PROJECT_PATH}\lib'
 
+# Snapshot of the real project layout injected into every agent prompt.
+# Keeps agents from hallucinating file paths like 'lib/models/pet.dart'.
+PROJECT_MAP = f"""
+Project root : {PROJECT_PATH}
+Source files : {LIB_PATH}\\
+  main.dart                          <- app entry point, navigation
+  src\\
+    data\\
+      models\\                        <- data classes
+        pet.dart                     <- Pet class, starterPets() list
+        item.dart
+      repositories\\                  <- data access layer
+        game_repository.dart
+        local_game_repository.dart
+        firestore_game_repository.dart
+    state\\
+      game_state.dart                <- ChangeNotifier, holds GameState
+    ui\\
+      tabs\\
+        battle_tab.dart              <- Battle UI tab
+        pet_tab.dart                 <- Pet UI tab
+        shop_tab.dart                <- Shop UI tab
+      theme\\
+        app_theme.dart
+      widgets\\                      <- shared widgets
+      overlay\\
+    graphics\\
+      enemy_sprites.dart
+
+IMPORTANT: ALWAYS use ABSOLUTE paths (e.g. {LIB_PATH}\\src\\data\\models\\pet.dart).
+NEVER use relative paths like 'lib/models/pet.dart'.
+"""
+
 
 # --- 3. CUSTOM TOOLS ---
 class GitControlTool(BaseTool):
@@ -158,37 +191,35 @@ release_manager = Agent(
 # --- 6. TASKS ---
 task_plan = Task(
     description=(
-        f"The Flutter project is located at: {LIB_PATH}\n\n"
+        f"PROJECT LAYOUT:\n{PROJECT_MAP}\n"
         f"USER TASK: {USER_TASK}\n\n"
         "Your job:\n"
-        "1. Use the directory tool to list files in the lib folder.\n"
-        "2. Read the files that are relevant to this task.\n"
-        "3. Output a numbered implementation plan with: the exact files to modify "
-        "or create, and the precise code changes required (full class/widget names, "
-        "property names, logic). Be specific enough that a developer can implement "
-        "it without guessing."
+        "1. Use the directory tool if you need to explore further.\n"
+        "2. Read the files relevant to this task using ABSOLUTE paths from the layout above.\n"
+        "3. Output a numbered implementation plan. Each step must include:\n"
+        "   (a) the FULL ABSOLUTE file path (e.g. C:\\...\\lib\\src\\data\\models\\pet.dart),\n"
+        "   (b) CREATE or MODIFY,\n"
+        "   (c) the exact code to add or change."
     ),
     expected_output=(
-        "A numbered implementation plan. Each item must include: "
-        "(a) the full file path, (b) whether to CREATE or MODIFY it, "
-        "(c) exactly what code to add or change."
+        "A numbered implementation plan where every file path is ABSOLUTE. "
+        "Each item: (a) full absolute path, (b) CREATE or MODIFY, (c) exact code changes."
     ),
     agent=code_planner,
 )
 task_design = Task(
     description=(
-        f"The user wants to implement this in the game:\n  {USER_TASK}\n\n"
+        f"PROJECT LAYOUT:\n{PROJECT_MAP}\n"
+        f"USER TASK: {USER_TASK}\n\n"
         "You have the Code Planner's technical plan in your context. "
-        "Now add the game design perspective. Read 1-2 relevant source files "
-        "(e.g. battle_tab.dart, pet_tab.dart) to understand the current UX, then "
-        "propose 3-5 creative improvements that would make this feature more "
-        "engaging, satisfying, or polished for the player. "
-        "Think about: visual feedback, animations, progression hooks, sound cues, "
-        "or small surprises that delight the player."
+        "Read 1-2 relevant game files using ABSOLUTE paths (from the layout above) "
+        "to understand the current UX, then propose 3-5 creative improvements "
+        "that make this feature more engaging: juicy feedback, animations, "
+        "progression hooks, or player surprises."
     ),
     expected_output=(
         "A list of 3-5 game design suggestions, each with: feature name, "
-        "why it improves player engagement, and a concrete Flutter implementation hint."
+        "why it improves engagement, and a concrete Flutter/Dart implementation hint."
     ),
     agent=game_designer,
     context=[task_plan],
@@ -196,13 +227,14 @@ task_design = Task(
 
 task_implement = Task(
     description=(
+        f"PROJECT LAYOUT:\n{PROJECT_MAP}\n"
         f"USER TASK: {USER_TASK}\n\n"
-        "Follow the implementation plan from the Code Planner (in your context). "
+        "Follow the implementation plan from the Code Planner (in your context).\n"
         "For each file in the plan:\n"
-        "1. Read the current file content with file_read_tool.\n"
+        "1. Read it with file_read_tool using its FULL ABSOLUTE path.\n"
         "2. Apply the planned changes.\n"
-        "3. Write the FULL updated file using file_writer_tool.\n"
-        "Do NOT write partial snippets. Do NOT re-write the same file twice. "
+        "3. Write the COMPLETE updated file using file_writer_tool with the FULL ABSOLUTE path.\n"
+        "RULES: Never write partial snippets. Never re-write the same file twice. "
         "When all files are written, immediately output your Final Answer."
     ),
     expected_output=(
