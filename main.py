@@ -54,11 +54,13 @@ class GitControlTool(BaseTool):
         except Exception as e:
             return f"Git Error: {str(e)}"
 
+import os
+from crewai import LLM
+
 # --- INITIALIZE TOOLS & MODEL ---
-local_llm = ChatOllama(
-    model="qwen2.5-coder:14b-instruct",
-    base_url="http://localhost:11434",
-    temperature=0.1
+local_llm = LLM(
+    model="ollama/qwen2.5-coder:14b-instruct",
+    base_url="http://localhost:11434"
 )
 
 dir_tool = DirectoryReadTool(directory=PROJECT_PATH)
@@ -192,6 +194,7 @@ wanderers_crew = Crew(
     tasks=[task_analyze_project, task_execute_improvement, task_qa_and_format],
     process=Process.hierarchical,
     manager_agent=project_manager,
+    manager_llm=local_llm,
     memory=True,  
     verbose=True,
     embedder={
