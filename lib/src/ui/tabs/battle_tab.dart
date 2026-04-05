@@ -2182,9 +2182,10 @@ class Monster {
     final int imageIndex = (step ~/ 50);
     // Use existing icons as placeholders for new types
     final String assetSearchName = switch (type) {
-      MonsterType.skeleton || MonsterType.orc => 'Bandit',
-      MonsterType.ghost => 'Slime',
-      MonsterType.demon => 'Spider',
+      MonsterType.skeleton => 'Skeleton',
+      MonsterType.orc => 'Orc',
+      MonsterType.ghost => 'Ghost',
+      MonsterType.demon => 'Demon',
       _ => name,
     };
     final image = gs.pickEnemyImage(assetSearchName, difficultyIndex: imageIndex);
