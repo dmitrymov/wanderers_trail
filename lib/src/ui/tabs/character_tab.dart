@@ -115,6 +115,16 @@ class CharacterTab extends StatelessWidget {
               enabled: p.coins >= gs.staminaUpgradeCost,
               onPressed: () => gs.upgradeStamina(),
             ),
+            const SizedBox(height: AppTokens.gap12),
+            _upgradeRow(
+              context,
+              label: 'Combat Speed',
+              value: '${p.speedMultiplier.toStringAsFixed(1)}x / ${gs.maxSpeedMultiplier.toStringAsFixed(1)}x',
+              buttonLabel:
+                  'Upgrade +${GameState.speedUpgradeStep} (${gs.speedUpgradeCost}🪙)',
+              enabled: p.coins >= gs.speedUpgradeCost && gs.maxSpeedMultiplier < 2.0,
+              onPressed: () => gs.upgradeSpeed(),
+            ),
           ],
         ),
         const SizedBox(height: AppTokens.gap12),
@@ -247,6 +257,48 @@ class CharacterTab extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ],
+        ),
+        const SizedBox(height: AppTokens.gap12),
+        _sectionCard(
+          context,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.speed, size: 22, color: scheme.primary),
+                const SizedBox(width: 10),
+                Text('Combat speed', style: Theme.of(context).textTheme.titleMedium),
+              ],
+            ),
+            const SizedBox(height: AppTokens.gap8),
+            Row(
+              children: [
+                Text('Speed multiplier', style: TextStyle(color: muted)),
+                const Spacer(),
+                Text(
+                  '${p.speedMultiplier.toStringAsFixed(1)}x',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ],
+            ),
+            Slider(
+              value: p.speedMultiplier,
+              min: 0.1,
+              max: gs.maxSpeedMultiplier,
+              divisions: (gs.maxSpeedMultiplier * 10 - 1).round(),
+              label: '${p.speedMultiplier.toStringAsFixed(1)}x',
+              onChanged: (val) {
+                context.read<GameState>().setSpeedMultiplier(val);
+              },
+            ),
+            Text(
+              'Upgrade "Combat Speed" above to increase this limit.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: muted.withValues(alpha: 0.5),
+                    fontStyle: FontStyle.italic,
+                  ),
             ),
           ],
         ),

@@ -298,8 +298,11 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   String? _encounterBanner;
   Timer? _encounterBannerTimer;
 
-  /// 1.0 matches original combat speed. Use ~1.08 if you want slightly calmer fights (was 1.6 and felt sluggish).
-  static const double _combatPaceScale = 1.0;
+  /// >1 slows every swing so players can read attack timing (bars + countdown).
+  static const double _combatPaceScale = 1.42;
+
+  /// Bumps on each hit the monster takes — drives recoil / HP flash animations.
+  int _monsterHitVersion = 0;
 
   /// After both you and the enemy resolve an attack, log HP lost this exchange.
   int _exchangeRound = 1;
@@ -351,6 +354,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     );
 
     setState(() {
+      _monsterHitVersion++;
       _monster = _monster!.hit(finalDamage);
     });
 
@@ -385,7 +389,14 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   }
 
   int _scaleCombatMs(int ms) =>
-      (ms * _combatPaceScale).round().clamp(400, 2000);
+      (ms * _combatPaceScale).round().clamp(560, 3200);
+
+  /// Seconds until the scheduled automatic hit (for UI countdown).
+  double _secondsUntilNextHit(DateTime? next) {
+    if (next == null) return 0;
+    final ms = next.difference(DateTime.now()).inMilliseconds;
+    return (ms / 1000.0).clamp(0.0, 999.0);
+  }
 
   void _resetExchangeRoundTracking() {
     _exchangeRound = 1;
@@ -518,6 +529,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   void _startCombat(GameState gs) {
     _stopCombat(notify: false);
     if (_monster == null) return;
+    _monsterHitVersion = 0;
     context.read<GameState>().setCombatActive(true);
     _playerIntervalMs = _scaleCombatMs(_calcPlayerIntervalMs(gs));
     _monsterIntervalMs = _scaleCombatMs(_monster!.attackMs);
@@ -590,6 +602,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           }
 
           setState(() {
+            _monsterHitVersion++;
             _monster = _monster!.hit(finalDamage);
           });
           _onPlayerAttackResolved(finalDamage);
@@ -1249,48 +1262,96 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
                                       ),
                                     ),
                                     const SizedBox(height: 8),
-                                    SizedBox(
-                                      width: 96,
-                                      height: 96,
-                                      child: Image.asset(
-                                        m.imageAsset,
-                                        fit: BoxFit.contain,
-                                        errorBuilder:
-                                            (c, e, s) => const Icon(
-                                              Icons.pest_control,
-                                              color: Colors.white54,
-                                              size: 64,
-                                            ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    _MonsterHpBar(
-                                      current: m.hp,
-                                      max: m.maxHp,
+                                    _MonsterPortrait(
+                                      imageAsset: m.imageAsset,
+                                      hitVersion: _monsterHitVersion,
+                                      windUpScale: _progressTo(
+                                                _nextMonsterHit,
+                                                _monsterIntervalMs,
+                                              ) >
+                                              0.88
+                                          ? 1.0 +
+                                              0.04 *
+                                                  sin(
+                                                    DateTime.now()
+                                                            .millisecondsSinceEpoch /
+                                                        185.0,
+                                                  )
+                                          : 1.0,
                                     ),
                                     const SizedBox(height: 8),
                                     Padding(
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 24.0,
+                                        horizontal: 8,
+                                      ),
+                                      child: _MonsterHpBar(
+                                        current: m.hp,
+                                        max: m.maxHp,
+                                        damageFlashKey: _monsterHitVersion,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 14),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
                                       ),
                                       child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          _AttackProgressBar(
-                                            label: 'You',
-                                            value: _progressTo(
+                                          Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.schedule,
+                                                color: Colors.white70,
+                                                size: 18,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              const Text(
+                                                'Attack timing',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'The bar fills as time passes. When it completes, that fighter swings automatically.',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              height: 1.35,
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.55),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          _AttackTimeline(
+                                            icon: Icons.sports_martial_arts,
+                                            title: 'Your next swing',
+                                            progress: _progressTo(
                                               _nextPlayerHit,
                                               _playerIntervalMs,
                                             ),
-                                            color: Colors.green,
+                                            secondsLeft: _secondsUntilNextHit(
+                                              _nextPlayerHit,
+                                            ),
+                                            accent: Colors.lightGreenAccent,
                                           ),
-                                          const SizedBox(height: 6),
-                                          _AttackProgressBar(
-                                            label: m.name,
-                                            value: _progressTo(
+                                          const SizedBox(height: 14),
+                                          _AttackTimeline(
+                                            icon: Icons.bolt,
+                                            title: "${m.name}'s next swing",
+                                            progress: _progressTo(
                                               _nextMonsterHit,
                                               _monsterIntervalMs,
                                             ),
-                                            color: Colors.redAccent,
+                                            secondsLeft: _secondsUntilNextHit(
+                                              _nextMonsterHit,
+                                            ),
+                                            accent: Colors.redAccent,
                                           ),
                                         ],
                                       ),
@@ -1630,51 +1691,182 @@ class _InventoryBar extends StatelessWidget {
   }
 }
 
-class _AttackProgressBar extends StatelessWidget {
-  const _AttackProgressBar({
-    required this.label,
-    required this.value,
-    required this.color,
+class _MonsterPortrait extends StatelessWidget {
+  const _MonsterPortrait({
+    required this.imageAsset,
+    required this.hitVersion,
+    required this.windUpScale,
   });
-  final String label;
-  final double value; // 0..1
-  final Color color;
+
+  final String imageAsset;
+  final int hitVersion;
+  final double windUpScale;
+
   @override
   Widget build(BuildContext context) {
+    final img = Image.asset(
+      imageAsset,
+      fit: BoxFit.contain,
+      errorBuilder:
+          (c, e, s) => const Icon(
+            Icons.pest_control,
+            color: Colors.white54,
+            size: 64,
+          ),
+    );
+
+    Widget scaled(Widget child) =>
+        Transform.scale(scale: windUpScale, child: child);
+
+    if (hitVersion == 0) {
+      return SizedBox(
+        width: 104,
+        height: 104,
+        child: scaled(img),
+      );
+    }
+
+    return SizedBox(
+      width: 104,
+      height: 104,
+      child: TweenAnimationBuilder<double>(
+        key: ValueKey(hitVersion),
+        tween: Tween(begin: 1.14, end: 1.0),
+        duration: const Duration(milliseconds: 340),
+        curve: Curves.elasticOut,
+        builder: (context, recoil, child) =>
+            Transform.scale(scale: recoil * windUpScale, child: child),
+        child: img,
+      ),
+    );
+  }
+}
+
+/// Clear attack schedule: label, live countdown, fill bar, glowing marker at the tip.
+class _AttackTimeline extends StatelessWidget {
+  const _AttackTimeline({
+    required this.icon,
+    required this.title,
+    required this.progress,
+    required this.secondsLeft,
+    required this.accent,
+  });
+
+  final IconData icon;
+  final String title;
+  final double progress;
+  final double secondsLeft;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = progress.clamp(0.0, 1.0);
+    final striking = secondsLeft < 0.12;
+    final timeLabel = striking ? 'Striking…' : '${secondsLeft.toStringAsFixed(1)} s';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              label,
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            Icon(icon, size: 20, color: accent),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
             ),
-            Text(
-              '${(value * 100).toInt()}%',
-              style: const TextStyle(color: Colors.white38, fontSize: 12),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: striking ? 0.5 : 0.32),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: accent.withValues(alpha: striking ? 1 : 0.55),
+                  width: striking ? 1.5 : 1,
+                ),
+              ),
+              child: Text(
+                timeLabel,
+                style: TextStyle(
+                  color: accent,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                ),
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 2),
-        Container(
-          height: 10,
-          decoration: BoxDecoration(
-            color: Colors.white24,
-            borderRadius: BorderRadius.circular(5),
-          ),
-          alignment: Alignment.centerLeft,
-          child: FractionallySizedBox(
-            widthFactor: value,
-            child: Container(
-              height: 10,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(5),
+        const SizedBox(height: 8),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final w = constraints.maxWidth;
+            final fillW = max(0.0, w * p);
+            final markerX = (p * w - 7).clamp(0.0, w - 14);
+            return SizedBox(
+              height: 22,
+              width: w,
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.centerLeft,
+                children: [
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(11),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: SizedBox(width: w, height: 22),
+                  ),
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    width: fillW,
+                    height: 22,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(11),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              accent.withValues(alpha: 0.55),
+                              accent,
+                            ],
+                          ),
+                        ),
+                        child: const SizedBox.expand(),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: markerX,
+                    top: 0,
+                    child: Container(
+                      width: 14,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: accent.withValues(alpha: 0.95),
+                            blurRadius: 10,
+                            spreadRadius: 0.5,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ),
+            );
+          },
         ),
       ],
     );
@@ -1682,29 +1874,65 @@ class _AttackProgressBar extends StatelessWidget {
 }
 
 class _MonsterHpBar extends StatelessWidget {
-  const _MonsterHpBar({required this.current, required this.max});
+  const _MonsterHpBar({
+    required this.current,
+    required this.max,
+    this.damageFlashKey = 0,
+  });
+
   final int current;
   final int max;
+  final int damageFlashKey;
+
   @override
   Widget build(BuildContext context) {
     final pct = (current / max).clamp(0, 1).toDouble();
-    return Container(
-      width: 220,
-      height: 14,
-      decoration: BoxDecoration(
-        color: Colors.white24,
-        borderRadius: BorderRadius.circular(7),
-      ),
-      alignment: Alignment.centerLeft,
-      child: FractionallySizedBox(
-        widthFactor: pct,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.redAccent,
-            borderRadius: BorderRadius.circular(7),
+    return LayoutBuilder(
+      builder: (context, c) {
+        final w = c.maxWidth;
+        final rawFill = w * pct;
+        final fillW = pct <= 0 ? 0.0 : (rawFill < 1 ? 1.0 : rawFill);
+        return SizedBox(
+          height: 18,
+          width: w,
+          child: Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(9),
+                child: ColoredBox(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  child: SizedBox(width: w, height: 18),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                top: 0,
+                width: fillW,
+                height: 18,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(9),
+                  child: const ColoredBox(color: Colors.redAccent),
+                ),
+              ),
+              if (damageFlashKey > 0)
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(9),
+                    child: TweenAnimationBuilder<double>(
+                      key: ValueKey(damageFlashKey),
+                      tween: Tween(begin: 0.55, end: 0.0),
+                      duration: const Duration(milliseconds: 420),
+                      curve: Curves.easeOut,
+                      builder: (_, flash, __) => ColoredBox(
+                        color: Colors.white.withValues(alpha: flash),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

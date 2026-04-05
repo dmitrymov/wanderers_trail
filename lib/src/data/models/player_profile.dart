@@ -11,10 +11,12 @@ class PlayerProfile {
   // Run-limited maximums (reset on New Run / Resume Checkpoint)
   final int maxHealth;
   final int maxStamina;
+  final double speedMultiplier;
 
   // Number of upgrades purchased this run (affects cost scaling)
   final int healthUpgrades;
   final int staminaUpgrades;
+  final int speedUpgrades;
 
   // Permanent upgrade levels (persist across runs)
   final int permHealthLevel;   // +10 max health per level
@@ -41,10 +43,12 @@ class PlayerProfile {
     required this.maxStamina,
     required this.healthUpgrades,
     required this.staminaUpgrades,
+    required this.speedUpgrades,
     required this.permHealthLevel,
     required this.permStaminaLevel,
     required this.permAttackLevel,
     required this.permDefenseLevel,
+    required this.speedMultiplier,
     this.weapon,
     this.armor,
     this.ring,
@@ -66,10 +70,12 @@ class PlayerProfile {
     int? maxStamina,
     int? healthUpgrades,
     int? staminaUpgrades,
+    int? speedUpgrades,
     int? permHealthLevel,
     int? permStaminaLevel,
     int? permAttackLevel,
     int? permDefenseLevel,
+    double? speedMultiplier,
     Object? weapon = _unset,
     Object? armor = _unset,
     Object? ring = _unset,
@@ -87,10 +93,12 @@ class PlayerProfile {
         maxStamina: maxStamina ?? this.maxStamina,
         healthUpgrades: healthUpgrades ?? this.healthUpgrades,
         staminaUpgrades: staminaUpgrades ?? this.staminaUpgrades,
+        speedUpgrades: speedUpgrades ?? this.speedUpgrades,
         permHealthLevel: permHealthLevel ?? this.permHealthLevel,
         permStaminaLevel: permStaminaLevel ?? this.permStaminaLevel,
         permAttackLevel: permAttackLevel ?? this.permAttackLevel,
         permDefenseLevel: permDefenseLevel ?? this.permDefenseLevel,
+        speedMultiplier: speedMultiplier ?? this.speedMultiplier,
         weapon: identical(weapon, _unset) ? this.weapon : weapon as Item?,
         armor: identical(armor, _unset) ? this.armor : armor as Item?,
         ring: identical(ring, _unset) ? this.ring : ring as Item?,
@@ -110,10 +118,12 @@ class PlayerProfile {
         'maxStamina': maxStamina,
         'healthUpgrades': healthUpgrades,
         'staminaUpgrades': staminaUpgrades,
+        'speedUpgrades': speedUpgrades,
         'permHealthLevel': permHealthLevel,
         'permStaminaLevel': permStaminaLevel,
         'permAttackLevel': permAttackLevel,
         'permDefenseLevel': permDefenseLevel,
+        'speedMultiplier': speedMultiplier,
         'weapon': weapon?.toJson(),
         'armor': armor?.toJson(),
         'ring': ring?.toJson(),
@@ -133,10 +143,12 @@ class PlayerProfile {
         maxStamina: (json['maxStamina'] as num?)?.toInt() ?? (json['stamina'] as num).toInt(),
         healthUpgrades: (json['healthUpgrades'] as num?)?.toInt() ?? 0,
         staminaUpgrades: (json['staminaUpgrades'] as num?)?.toInt() ?? 0,
+        speedUpgrades: (json['speedUpgrades'] as num?)?.toInt() ?? 0,
         permHealthLevel: (json['permHealthLevel'] as num?)?.toInt() ?? 0,
         permStaminaLevel: (json['permStaminaLevel'] as num?)?.toInt() ?? 0,
         permAttackLevel: (json['permAttackLevel'] as num?)?.toInt() ?? 0,
         permDefenseLevel: (json['permDefenseLevel'] as num?)?.toInt() ?? 0,
+        speedMultiplier: (json['speedMultiplier'] as num?)?.toDouble() ?? 1.0,
         weapon:
             json['weapon'] == null ? null : Item.fromJson(json['weapon'] as Map<String, dynamic>),
         armor: json['armor'] == null ? null : Item.fromJson(json['armor'] as Map<String, dynamic>),
@@ -157,10 +169,12 @@ class PlayerProfile {
         maxStamina: 100,
         healthUpgrades: 0,
         staminaUpgrades: 0,
+        speedUpgrades: 0,
         permHealthLevel: 0,
         permStaminaLevel: 0,
         permAttackLevel: 0,
         permDefenseLevel: 0,
+        speedMultiplier: 1.0,
         savedStep: null,
       );
 }

@@ -46,7 +46,7 @@ class GameState extends ChangeNotifier {
   bool get isBlessActive =>
       _blessUntil != null && DateTime.now().isBefore(_blessUntil!);
   double get attackSpeedMultiplier =>
-      isBlessActive ? _blessAttackSpeedMul : 1.0;
+      (isBlessActive ? _blessAttackSpeedMul : 1.0) * profile.speedMultiplier;
   double get staminaRegenMultiplier =>
       isBlessActive ? _blessStaminaRegenMul : 1.0;
   int get blessRemainingSeconds {
@@ -83,15 +83,18 @@ class GameState extends ChangeNotifier {
     maxStamina: 100,
     healthUpgrades: 0,
     staminaUpgrades: 0,
+    speedUpgrades: 0,
     permHealthLevel: 0,
     permStaminaLevel: 0,
     permAttackLevel: 0,
     permDefenseLevel: 0,
+    speedMultiplier: 1.0,
   );
 
   // Upgrade config
   static const int healthUpgradeStep = 10;
   static const int staminaUpgradeStep = 10;
+  static const double speedUpgradeStep = 0.1;
 
   // Permanent upgrade steps and cost formula (diamonds)
   static const int permHealthStep = 10;
@@ -101,6 +104,10 @@ class GameState extends ChangeNotifier {
 
   int get healthUpgradeCost => 10 + 5 * profile.healthUpgrades;
   int get staminaUpgradeCost => 10 + 5 * profile.staminaUpgrades;
+  int get speedUpgradeCost => 50 + 25 * profile.speedUpgrades;
+
+  double get maxSpeedMultiplier =>
+      (1.0 + profile.speedUpgrades * speedUpgradeStep).clamp(1.0, 2.0);
 
   // Diamonds and permanent upgrades
   int get diamonds => profile.diamonds;
@@ -158,6 +165,13 @@ class GameState extends ChangeNotifier {
     _persist();
   }
 
+  void setSpeedMultiplier(double value) {
+    _profile = profile.copyWith(speedMultiplier: value);
+    _invalidateStatsCache();
+    notifyListeners();
+    _persist();
+  }
+
   void resetForNewRun() {
     final baseMaxH = 100 + permHealthLevel * permHealthStep;
     final baseMaxS = 100 + permStaminaLevel * permStaminaStep;
@@ -168,6 +182,8 @@ class GameState extends ChangeNotifier {
       maxStamina: baseMaxS,
       healthUpgrades: 0,
       staminaUpgrades: 0,
+      speedUpgrades: 0,
+      speedMultiplier: profile.speedMultiplier.clamp(0.1, 1.0),
       weapon: null, // cleared explicitly via sentinel-aware copyWith
       armor: null,
       ring: null,
@@ -190,6 +206,8 @@ class GameState extends ChangeNotifier {
       maxStamina: baseMaxS,
       healthUpgrades: 0,
       staminaUpgrades: 0,
+      speedUpgrades: 0,
+      speedMultiplier: profile.speedMultiplier.clamp(0.1, 1.0),
       savedStep: null,
     );
     notifyListeners();
@@ -246,6 +264,22 @@ class GameState extends ChangeNotifier {
       coins: profile.coins - cost,
       staminaUpgrades: profile.staminaUpgrades + 1,
     );
+    notifyListeners();
+    _persist();
+    return true;
+  }
+
+  bool upgradeSpeed() {
+    final cost = speedUpgradeCost;
+    if (profile.coins < cost) return false;
+    _profile = profile.copyWith(
+      coins: profile.coins - cost,
+      speedUpgrades: profile.speedUpgrades + 1,
+    );
+    // Automatically bump current speed if it was at previous max
+    if (profile.speedMultiplier >= maxSpeedMultiplier - speedUpgradeStep - 0.01) {
+      _profile = _profile!.copyWith(speedMultiplier: maxSpeedMultiplier);
+    }
     notifyListeners();
     _persist();
     return true;
