@@ -11,7 +11,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
 
-enum PermanentUpgrade { health, stamina, attack, defense }
+enum PermanentUpgrade { health, stamina, attack, defense, speed }
 
 class GameState extends ChangeNotifier {
   final GameRepository repo;
@@ -90,6 +90,7 @@ class GameState extends ChangeNotifier {
     permStaminaLevel: 0,
     permAttackLevel: 0,
     permDefenseLevel: 0,
+    permSpeedLevel: 0,
     speedMultiplier: 0.1,
   );
 
@@ -103,13 +104,14 @@ class GameState extends ChangeNotifier {
   static const int permStaminaStep = 10;
   static const int permAttackStep = 1;
   static const int permDefenseStep = 1;
+  static const double permSpeedStep = 0.1;
 
   int get healthUpgradeCost => 10 + 5 * profile.healthUpgrades;
   int get staminaUpgradeCost => 10 + 5 * profile.staminaUpgrades;
   int get speedUpgradeCost => 50 + 25 * profile.speedUpgrades;
 
   double get maxSpeedMultiplier =>
-      (1.0 + profile.speedUpgrades * speedUpgradeStep).clamp(1.0, 2.0);
+      (1.0 + profile.speedUpgrades * speedUpgradeStep + profile.permSpeedLevel * permSpeedStep).clamp(1.0, 3.0);
 
   // Diamonds and permanent upgrades
   int get diamonds => profile.diamonds;
@@ -124,6 +126,7 @@ class GameState extends ChangeNotifier {
       PermanentUpgrade.stamina => permStaminaLevel,
       PermanentUpgrade.attack => permAttackLevel,
       PermanentUpgrade.defense => permDefenseLevel,
+      PermanentUpgrade.speed => profile.permSpeedLevel,
     };
     return 20 + 10 * level; // simple scaling
   }
@@ -209,7 +212,7 @@ class GameState extends ChangeNotifier {
       healthUpgrades: 0,
       staminaUpgrades: 0,
       speedUpgrades: 0,
-      speedMultiplier: profile.speedMultiplier.clamp(0.1, 1.0),
+      speedMultiplier: profile.speedMultiplier.clamp(0.1, 1.0 + profile.permSpeedLevel * permSpeedStep),
       savedStep: null,
     );
     notifyListeners();
@@ -662,6 +665,12 @@ class GameState extends ChangeNotifier {
           permDefenseLevel: profile.permDefenseLevel + 1,
         );
         _invalidateStatsCache();
+        break;
+      case PermanentUpgrade.speed:
+        _profile = profile.copyWith(
+          diamonds: profile.diamonds - cost,
+          permSpeedLevel: profile.permSpeedLevel + 1,
+        );
         break;
     }
     notifyListeners();

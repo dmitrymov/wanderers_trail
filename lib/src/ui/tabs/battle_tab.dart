@@ -289,6 +289,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   int _poisonTicksRemaining = 0;
   int _poisonDamagePerTick = 0;
   int _poisonIntervalMs = 1000;
+  bool _skeletonReassembled = false;
 
   // Combat Log
   final List<_LogEntry> _logs = [];
@@ -529,6 +530,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     _stopCombat(notify: false);
     if (_monster == null) return;
     _monsterHitVersion = 0;
+    _skeletonReassembled = false;
     context.read<GameState>().setCombatActive(true);
     _playerIntervalMs = _scaleCombatMs(_calcPlayerIntervalMs(gs), gs);
     _monsterIntervalMs = _scaleCombatMs(_monster!.attackMs, gs);
@@ -559,8 +561,15 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           0.98,
         );
         final hit = _rnd.nextDouble() < hitChance;
+        bool evaded = false;
+        if (hit && _monster!.evasion > 0) {
+          // Check for Ghost-style evasion
+          if (_rnd.nextDouble() < _monster!.evasion) {
+            evaded = true;
+          }
+        }
         _nextPlayerHit = now.add(Duration(milliseconds: _playerIntervalMs));
-        if (hit) {
+        if (hit && !evaded) {
           var damage = _calcPlayerDamage(gs);
           // Crit roll
           final critChance = _sumStat(
@@ -606,16 +615,44 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           });
           _onPlayerAttackResolved(finalDamage);
           if (_monster!.hp <= 0) {
+            // Skeleton Reassemble check
+            if (_monster!.type == MonsterType.skeleton && !_skeletonReassembled) {
+              final chance = gs.cfgNum(['skeleton', 'reassemble', 'chance'], 0.3);
+              if (_rnd.nextDouble() < chance) {
+                _skeletonReassembled = true;
+                final hpPct = gs.cfgNum(['skeleton', 'reassemble', 'hp_percent'], 0.35);
+                final heal = (_monster!.maxHp * hpPct).toInt();
+                _monster = _monster!.hit(-heal); // Heal back
+                _log('Skeleton reassembled with $heal HP!', Colors.white);
+                OverlayService.showToast('Skeleton rattling back to life!');
+                // Spawn "REVIVE" float
+                _floats.add(
+                  _DamageFloat(
+                    text: 'REASSEMBLE',
+                    color: Colors.white,
+                    start: now,
+                    duration: const Duration(milliseconds: 1200),
+                    xFrac: 0.5,
+                    yFrac: 0.24,
+                    rise: 40,
+                    punch: true,
+                    fontSize: 22,
+                  ),
+                );
+                return; // Continue combat
+              }
+            }
             _onMonsterDefeated(gs);
             return;
           }
         } else {
-          // Miss float
+          // Miss or Evaded float
           final fx = 0.5 + (_rnd.nextDouble() - 0.5) * 0.18;
-          _log('You missed ${_monster!.name}.', Colors.white38);
+          final msg = evaded ? 'EVADED' : 'MISS';
+          _log('You ${evaded ? "were evaded by" : "missed"} ${_monster!.name}.', Colors.white38);
           _floats.add(
             _DamageFloat(
-              text: 'MISS',
+              text: msg,
               color: Colors.white70,
               start: now,
               duration: const Duration(milliseconds: 1000),
@@ -648,8 +685,34 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
             raw = max(1, (raw * factor).round());
           }
           final defense = _calcPlayerDefense(gs);
-          final dmg = _reduceByDefense(raw, defense);
+          // Orc Crushing Blow check
+          int finalDef = defense;
+          bool crushed = false;
+          if (_monster!.type == MonsterType.orc) {
+            final chance = gs.cfgNum(['orc', 'crushing_blow', 'chance'], 0.25);
+            if (_rnd.nextDouble() < chance) {
+              final ignore = gs.cfgNum(['orc', 'crushing_blow', 'defense_ignore'], 0.5);
+              finalDef = (defense * (1.0 - ignore)).round();
+              crushed = true;
+            }
+          }
+          final dmg = _reduceByDefense(raw, finalDef);
           monsterSwingDamage = dmg;
+          if (crushed) {
+            _log('Orc CRUSHING BLOW ignored some defense!', Colors.orangeAccent);
+            _floats.add(
+              _DamageFloat(
+                text: 'CRUSH',
+                color: Colors.orangeAccent,
+                start: now,
+                duration: const Duration(milliseconds: 1000),
+                xFrac: 0.15,
+                yFrac: 0.05,
+                rise: 20,
+                fontSize: 18,
+              ),
+            );
+          }
           // Spawn damage float near player HUD
           final fx = 0.15 + (_rnd.nextDouble() - 0.5) * 0.12;
           _floats.add(
@@ -776,6 +839,28 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
                 Colors.orangeAccent,
               );
             }
+          }
+          // Demon Lifesteal check
+          if (_monster!.type == MonsterType.demon && monsterSwingDamage > 0) {
+            final lPct = gs.cfgNum(['demon', 'lifesteal', 'percent'], 0.25);
+            final minH = gs.cfgInt(['demon', 'lifesteal', 'min_heal'], 2);
+            final heal = max(minH, (monsterSwingDamage * lPct).toInt());
+            setState(() {
+              _monster = _monster!.hit(-heal); // Heal
+            });
+            _log('Demon lifestole $heal HP!', Colors.redAccent);
+            _floats.add(
+              _DamageFloat(
+                text: '+$heal',
+                color: Colors.lightGreenAccent,
+                start: now,
+                duration: const Duration(milliseconds: 1200),
+                xFrac: 0.5,
+                yFrac: 0.2,
+                rise: 30,
+                fontSize: 20,
+              ),
+            );
           }
           _onMonsterAttackResolved(monsterSwingDamage);
           if (gs.profile.health <= 0) {
@@ -1967,6 +2052,7 @@ class Monster {
   final int attackMs; // attack interval in milliseconds
   final int defense; // reduces damage taken
   final double accuracy; // 0..1 base accuracy
+  final double evasion; // 0..1 chance to avoid being hit
   final String imageAsset; // enemy image asset path
   const Monster({
     required this.name,
@@ -1977,6 +2063,7 @@ class Monster {
     required this.attackMs,
     required this.defense,
     required this.accuracy,
+    required this.evasion,
     required this.imageAsset,
   });
 
@@ -1989,6 +2076,7 @@ class Monster {
     attackMs: attackMs,
     defense: defense,
     accuracy: accuracy,
+    evasion: evasion,
     imageAsset: imageAsset,
   );
 
@@ -2038,6 +2126,7 @@ class Monster {
     double defAdd = 0.0;
     int msSpeedBonus = 0;
     double accBonus = 0.0;
+    double evaBonus = 0.0;
 
     switch (type) {
       case MonsterType.wolf:
@@ -2057,6 +2146,7 @@ class Monster {
         hpMul = 0.6;
         accBonus = 0.15;
         msSpeedBonus = 200; // Evasive glass cannon
+        evaBonus = gs.cfgNum(['ghost', 'evasion', 'base_rate'], 0.15);
         break;
       case MonsterType.demon:
         hpMul = 1.2;
@@ -2072,6 +2162,7 @@ class Monster {
     final int finalAttackMs = (ms - msSpeedBonus).clamp(400, 2000);
     final int finalDefense = (defense + defAdd).toInt();
     final double finalAccuracy = (accuracy + accBonus).clamp(0.4, 0.98);
+    final double finalEvasion = evaBonus.clamp(0.0, 0.6);
 
     // Difficulty index derived from monster stats (not step)
     final hpDiv = gs.cfgNum(['score_weights', 'hp_div'], 50.0);
@@ -2107,6 +2198,7 @@ class Monster {
       attackMs: finalAttackMs,
       defense: finalDefense,
       accuracy: finalAccuracy,
+      evasion: finalEvasion,
       imageAsset: image,
     );
   }

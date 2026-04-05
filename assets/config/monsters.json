@@ -31,8 +31,29 @@
   "bandit": {
     "coin_steal": { "base": 1, "per_tier": 2, "max": 50 }
   },
-  "skeleton": {},
-  "orc": {},
-  "ghost": {},
-  "demon": {}
+  "skeleton": {
+    "reassemble": {
+      "chance": 0.3,
+      "hp_percent": 0.35,
+      "max_per_battle": 1
+    }
+  },
+  "orc": {
+    "crushing_blow": {
+      "chance": 0.25,
+      "defense_ignore": 0.5
+    }
+  },
+  "ghost": {
+    "evasion": {
+      "base_rate": 0.15,
+      "max_rate": 0.4
+    }
+  },
+  "demon": {
+    "lifesteal": {
+      "percent": 0.25,
+      "min_heal": 2
+    }
+  }
 }

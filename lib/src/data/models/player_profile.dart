@@ -23,6 +23,7 @@ class PlayerProfile {
   final int permStaminaLevel;  // +10 max stamina per level
   final int permAttackLevel;   // +1 attack per level
   final int permDefenseLevel;  // +1 defense per level
+  final int permSpeedLevel;    // +0.1 max speed multiplier per level
 
   final Item? weapon;
   final Item? armor;
@@ -48,6 +49,7 @@ class PlayerProfile {
     required this.permStaminaLevel,
     required this.permAttackLevel,
     required this.permDefenseLevel,
+    required this.permSpeedLevel,
     required this.speedMultiplier,
     this.weapon,
     this.armor,
@@ -75,6 +77,7 @@ class PlayerProfile {
     int? permStaminaLevel,
     int? permAttackLevel,
     int? permDefenseLevel,
+    int? permSpeedLevel,
     double? speedMultiplier,
     Object? weapon = _unset,
     Object? armor = _unset,
@@ -98,6 +101,7 @@ class PlayerProfile {
         permStaminaLevel: permStaminaLevel ?? this.permStaminaLevel,
         permAttackLevel: permAttackLevel ?? this.permAttackLevel,
         permDefenseLevel: permDefenseLevel ?? this.permDefenseLevel,
+        permSpeedLevel: permSpeedLevel ?? this.permSpeedLevel,
         speedMultiplier: speedMultiplier ?? this.speedMultiplier,
         weapon: identical(weapon, _unset) ? this.weapon : weapon as Item?,
         armor: identical(armor, _unset) ? this.armor : armor as Item?,
@@ -123,6 +127,7 @@ class PlayerProfile {
         'permStaminaLevel': permStaminaLevel,
         'permAttackLevel': permAttackLevel,
         'permDefenseLevel': permDefenseLevel,
+        'permSpeedLevel': permSpeedLevel,
         'speedMultiplier': speedMultiplier,
         'weapon': weapon?.toJson(),
         'armor': armor?.toJson(),
@@ -148,6 +153,7 @@ class PlayerProfile {
         permStaminaLevel: (json['permStaminaLevel'] as num?)?.toInt() ?? 0,
         permAttackLevel: (json['permAttackLevel'] as num?)?.toInt() ?? 0,
         permDefenseLevel: (json['permDefenseLevel'] as num?)?.toInt() ?? 0,
+        permSpeedLevel: (json['permSpeedLevel'] as num?)?.toInt() ?? 0,
         speedMultiplier: (json['speedMultiplier'] as num?)?.toDouble() ?? 1.0,
         weapon:
             json['weapon'] == null ? null : Item.fromJson(json['weapon'] as Map<String, dynamic>),
@@ -174,6 +180,7 @@ class PlayerProfile {
         permStaminaLevel: 0,
         permAttackLevel: 0,
         permDefenseLevel: 0,
+        permSpeedLevel: 0,
         speedMultiplier: 0.1,
         savedStep: null,
       );

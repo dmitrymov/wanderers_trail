@@ -153,10 +153,21 @@ class Item {
     // Base values by type
     int basePower;
     String baseName;
+    String? category;
     switch (type) {
       case ItemType.weapon:
         basePower = 4 + rnd.nextInt(4) + level; // attack
-        baseName = 'Trail Blade';
+        final cats = ['dagger', 'sword', 'axe', 'mace', 'bow', 'staff'];
+        category = cats[rnd.nextInt(cats.length)];
+        baseName = switch (category) {
+          'dagger' => 'Trail Dirk',
+          'sword' => 'Shortsword',
+          'axe' => 'Hand Axe',
+          'mace' => 'Heavy Mace',
+          'bow' => 'Short Bow',
+          'staff' => 'Old Staff',
+          _ => 'Trail Blade',
+        };
         break;
       case ItemType.armor:
         basePower = 3 + rnd.nextInt(3) + level; // defense
@@ -173,9 +184,62 @@ class Item {
     }
 
     final stats = _rollAdditionalStats(type, rarity, level, rnd);
-    final name = '${_rarityPrefix(rarity)}$baseName +$level';
+    final rarityPrefix = _rarityPrefix(rarity);
 
-    final image = _itemImagePath(type, rarity, rnd);
+    // If it's a weapon, maybe vary the base name slightly by rarity for flavor
+    if (type == ItemType.weapon && category != null) {
+      if (rarity == ItemRarity.rare) {
+        baseName = switch (category) {
+          'dagger' => 'Stiletto',
+          'sword' => 'Longsword',
+          'axe' => 'Battle Axe',
+          'mace' => 'War Hammer',
+          'bow' => 'Longbow',
+          'staff' => 'Magic Staff',
+          _ => baseName,
+        };
+      } else if (rarity == ItemRarity.legendary) {
+        baseName = switch (category) {
+          'dagger' => 'Shadow Edge',
+          'sword' => 'Excalibur',
+          'axe' => 'Executioner',
+          'mace' => 'Dragon Smasher',
+          'bow' => 'Heartseeker',
+          'staff' => 'Archmage Pillar',
+          _ => baseName,
+        };
+      } else if (rarity == ItemRarity.mystic) {
+        baseName = switch (category) {
+          'dagger' => 'Astral Shard',
+          'sword' => 'Celestial Blade',
+          'axe' => 'Eternal Edge',
+          'mace' => 'Grand Smasher',
+          'bow' => 'Ethereal String',
+          'staff' => 'Cosmic Pillar',
+          _ => baseName,
+        };
+      }
+    } else {
+      // Non-weapon Mystic names
+      if (rarity == ItemRarity.mystic) {
+        baseName = switch (type) {
+          ItemType.armor => 'Aegis of Light',
+          ItemType.ring => 'Omega Band',
+          ItemType.boots => 'Seven-League Steps',
+          _ => baseName,
+        };
+      } else if (rarity == ItemRarity.legendary) {
+        baseName = switch (type) {
+          ItemType.armor => 'Dragon Plate',
+          ItemType.ring => 'Sovereign Signet',
+          ItemType.boots => 'Winged Greaves',
+          _ => baseName,
+        };
+      }
+    }
+
+    final name = '$rarityPrefix$baseName +$level';
+    final image = _itemImagePath(type, rarity, rnd, weaponCategory: category);
 
     return Item(
       id: idGen(),
@@ -204,10 +268,11 @@ class Item {
     }
   }
 
-  static String? _itemImagePath(ItemType type, ItemRarity rarity, Random rnd) {
+  static String? _itemImagePath(ItemType type, ItemRarity rarity, Random rnd,
+      {String? weaponCategory}) {
     switch (type) {
       case ItemType.weapon:
-        return _weaponImagePath(rarity, rnd);
+        return _weaponImagePath(rarity, rnd, category: weaponCategory);
       case ItemType.armor:
         return _armorImagePath(rarity, rnd);
       case ItemType.ring:
@@ -218,7 +283,8 @@ class Item {
   }
 
   // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
-  static String _weaponImagePath(ItemRarity rarity, Random rnd) {
+  static String _weaponImagePath(ItemRarity rarity, Random rnd,
+      {String? category}) {
     const categories = [
       'dagger',
       'sword',
@@ -227,7 +293,7 @@ class Item {
       'bow',
       'staff',
     ];
-    final cat = categories[rnd.nextInt(categories.length)];
+    final cat = category ?? categories[rnd.nextInt(categories.length)];
     final rarityCode = _rarityDigit(rarity);
     
     // Calculate variant ID.
@@ -383,10 +449,10 @@ class Item {
     // Rarity scaling
     final rarityMul = switch (rarity) {
       ItemRarity.normal => 1.0,
-      ItemRarity.uncommon => 1.1,
-      ItemRarity.rare => 1.25,
-      ItemRarity.legendary => 1.5,
-      ItemRarity.mystic => 1.8,
+      ItemRarity.uncommon => 1.15,
+      ItemRarity.rare => 1.35,
+      ItemRarity.legendary => 1.65,
+      ItemRarity.mystic => 2.25,
     };
     final v = baseMin + rnd.nextDouble() * (baseMax - baseMin);
     return double.parse((v * rarityMul * scale).toStringAsFixed(2));
@@ -405,5 +471,20 @@ class Item {
       case ItemRarity.mystic:
         return 'Mystic ';
     }
+  }
+
+  // Adds specific flavor text for high-rarity items
+  static String? flavorText(ItemRarity r, Random rnd) {
+    if (r == ItemRarity.mystic) {
+      final flavors = [
+        'A shimmering artifact from beyond the stars.',
+        'It hums with a power that bends the very air around it.',
+        'Forged in the heart of a dying sun.',
+        'Once held by the First Wanderer.',
+        'It feels weightless, yet strikes with infinite force.',
+      ];
+      return flavors[rnd.nextInt(flavors.length)];
+    }
+    return null;
   }
 }

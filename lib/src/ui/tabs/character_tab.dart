@@ -293,7 +293,7 @@ class CharacterTab extends StatelessWidget {
               },
             ),
             Text(
-              'Upgrade "Combat Speed" above to increase this limit.',
+              'Upgrade "Combat Speed" above or permanent "Speed" in the Shop to increase this limit.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: muted.withValues(alpha: 0.5),

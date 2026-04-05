@@ -173,6 +173,16 @@ class ShopTab extends StatelessWidget {
               ? () => gs.purchasePermanent(PermanentUpgrade.defense)
               : null,
         ),
+        const SizedBox(height: AppTokens.gap8),
+        _upgradeCard(
+          context,
+          title: 'Combat Speed +${GameState.permSpeedStep.toStringAsFixed(1)}x',
+          subtitle: 'Level ${gs.profile.permSpeedLevel} · max speed limit',
+          cost: gs.permanentUpgradeCost(PermanentUpgrade.speed),
+          onPressed: gs.diamonds >= gs.permanentUpgradeCost(PermanentUpgrade.speed)
+              ? () => gs.purchasePermanent(PermanentUpgrade.speed)
+              : null,
+        ),
       ],
     );
   }
