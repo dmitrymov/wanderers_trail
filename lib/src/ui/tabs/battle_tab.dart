@@ -1542,28 +1542,6 @@ class _InventoryBar extends StatelessWidget {
 
   Color _rarityColor(ItemRarity? r) => Color(rarityColorValue(r));
 
-  String _assetForItem(Item item) {
-    final path = item.imageAsset;
-    // If null or points to deprecated 'items' folder, use new fallback logic
-    if (path == null || path.contains('/items/')) {
-      final type = item.type.name;
-      String folder;
-      if (type == 'weapon') {
-        folder = 'weapons';
-      } else if (type == 'ring') {
-        folder = 'rings';
-      } else {
-        folder = type; // armor, boots
-      }
-      final ext = (type == 'armor' || type == 'boots') ? 'webp' : 'png';
-
-      // Use a known existing file as the universal base fallback for each type
-      if (type == 'weapon') return 'assets/images/weapons/dagger_01.png';
-      return 'assets/images/$folder/${type}_01.$ext';
-    }
-    return path;
-  }
-
   void _showItemDetails(BuildContext context, String label, Item item) {
     final color = _rarityColor(item.rarity);
     showModalBottomSheet(
@@ -1599,7 +1577,7 @@ class _InventoryBar extends StatelessWidget {
                     width: 40,
                     height: 40,
                     child: Image.asset(
-                      _assetForItem(item),
+                      item.effectiveAssetPath,
                       fit: BoxFit.contain,
                       errorBuilder:
                           (c, e, s) => Icon(Icons.inventory_2, color: color),
@@ -1680,7 +1658,7 @@ class _InventoryBar extends StatelessWidget {
                         width: 60,
                         height: 60,
                         child: Image.asset(
-                          _assetForItem(item),
+                          item.effectiveAssetPath,
                           fit: BoxFit.contain,
                           errorBuilder:
                               (c, e, s) => Icon(

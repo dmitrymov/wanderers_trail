@@ -138,9 +138,30 @@ class ItemDropPopup extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            item.name,
-            style: TextStyle(color: color, fontWeight: FontWeight.bold),
+          Row(
+            children: [
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: Image.asset(
+                  item.effectiveAssetPath,
+                  fit: BoxFit.contain,
+                  errorBuilder:
+                      (c, e, s) => Icon(
+                        Icons.inventory_2,
+                        color: color,
+                        size: 32,
+                      ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  item.name,
+                  style: TextStyle(color: color, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           Text('Type: ${item.type.name}'),

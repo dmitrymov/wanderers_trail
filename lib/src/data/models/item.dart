@@ -58,6 +58,34 @@ class Item {
     imageAsset: imageAsset ?? this.imageAsset,
   );
 
+  String get effectiveAssetPath {
+    final t = type.name;
+    String folder;
+    if (t == 'weapon') {
+      folder = 'weapons';
+    } else if (t == 'ring') {
+      folder = 'rings';
+    } else {
+      folder = t; // armor, boots
+    }
+
+    final ext = t == 'armor' ? 'webp' : 'png';
+    final code = _rarityDigit(rarity);
+
+    // Clamping for the 4 variants we have (01, 11, 21, 31).
+    final digit = int.tryParse(code)?.clamp(0, 3) ?? 0;
+    
+    // For weapons, if we don't have a specific imageAsset assigned at creation time,
+    // use a daggers as a base fallback.
+    final cur = imageAsset;
+    if (t == 'weapon') {
+      if (cur != null && cur.startsWith('assets/images/weapons/')) return cur;
+      return 'assets/images/weapons/dagger_01.png';
+    }
+
+    return 'assets/images/$folder/${t}_${digit}1.$ext';
+  }
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'type': type.name,
@@ -66,7 +94,7 @@ class Item {
     'level': level,
     'rarity': rarity.name,
     'stats': stats.map((k, v) => MapEntry(k.name, v)),
-    'image': imageAsset,
+    // No longer saving 'image' here as it's computed dynamically
   };
 
   factory Item.fromJson(Map<String, dynamic> json) {
@@ -99,6 +127,8 @@ class Item {
                 orElse: () => ItemRarity.normal,
               ),
       stats: stats,
+      // We still read the field if it exists for backward compatibility during transitions,
+      // but effectiveAssetPath will now ignore invalid ones.
       imageAsset: json['image'] as String?,
     );
   }
@@ -201,17 +231,21 @@ class Item {
 
   static String _armorImagePath(ItemRarity rarity, Random rnd) {
     final rarityCode = _rarityDigit(rarity);
-    return 'assets/images/armor/armor_${rarityCode}1.webp';
+    // Clamp to 0..3 since we only have 4 variants (01, 11, 21, 31)
+    final clampedCode = int.parse(rarityCode).clamp(0, 3);
+    return 'assets/images/armor/armor_${clampedCode}1.webp';
   }
 
   static String _ringImagePath(ItemRarity rarity, Random rnd) {
     final rarityCode = _rarityDigit(rarity);
-    return 'assets/images/rings/ring_${rarityCode}1.png';
+    final clampedCode = int.parse(rarityCode).clamp(0, 3);
+    return 'assets/images/rings/ring_${clampedCode}1.png';
   }
 
   static String _bootsImagePath(ItemRarity rarity, Random rnd) {
     final rarityCode = _rarityDigit(rarity);
-    return 'assets/images/boots/boots_${rarityCode}1.png';
+    final clampedCode = int.parse(rarityCode).clamp(0, 3);
+    return 'assets/images/boots/boots_${clampedCode}1.png';
   }
 
 
