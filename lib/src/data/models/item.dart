@@ -72,18 +72,23 @@ class Item {
     final ext = t == 'armor' ? 'webp' : 'png';
     final code = _rarityDigit(rarity);
 
-    // Clamping for the 4 variants we have (01, 11, 21, 31).
-    final digit = int.tryParse(code)?.clamp(0, 3) ?? 0;
-    
+    // Use a stable seed based on the item ID so the graphics don't "flicker" on every rebuild.
+    final Random seededRnd = Random(id.hashCode);
+
     // For weapons, if we don't have a specific imageAsset assigned at creation time,
-    // use a daggers as a base fallback.
+    // or if the saved one is old, re-roll a valid path STABLY.
     final cur = imageAsset;
     if (t == 'weapon') {
       if (cur != null && cur.startsWith('assets/images/weapons/')) return cur;
-      return 'assets/images/weapons/dagger_01.png';
+      return _weaponImagePath(rarity, seededRnd);
     }
 
-    return 'assets/images/$folder/${t}_${digit}1.$ext';
+    // New armor_41 is PNG, others are webp
+    if (t == 'armor' && code == '4') return 'assets/images/armor/armor_41.png';
+
+    // Everyone else uses Digit1 (e.g. boots_41.png, ring_01.png)
+    // We could add variant support here too using seededRnd if we had more files.
+    return 'assets/images/$folder/${t}_${code}1.$ext';
   }
 
   Map<String, dynamic> toJson() => {
@@ -219,33 +224,44 @@ class Item {
       'sword',
       'axe',
       'mace',
-      'spear',
       'bow',
       'staff',
     ];
     final cat = categories[rnd.nextInt(categories.length)];
     final rarityCode = _rarityDigit(rarity);
-    final id = rnd.nextInt(10); // 0..9 id suffix
-    return 'assets/images/weapons/${cat}_$rarityCode$id.png';
+    
+    // Calculate variant ID.
+    // Daggers have variants 1..6 for rarity 0, 1..2 for others.
+    // Others currently have variant 1.
+    int variantId = 1;
+    if (cat == 'dagger') {
+      if (rarity == ItemRarity.normal) {
+        variantId = 1 + rnd.nextInt(6);
+      } else if (rarity == ItemRarity.uncommon) {
+        variantId = 1 + rnd.nextInt(2);
+      } else if (rarity == ItemRarity.rare) {
+        variantId = 1 + rnd.nextInt(3);
+      } else if (rarity == ItemRarity.legendary) {
+        variantId = 1 + rnd.nextInt(2);
+      }
+    }
+    
+    return 'assets/images/weapons/${cat}_$rarityCode$variantId.png';
   }
 
   static String _armorImagePath(ItemRarity rarity, Random rnd) {
     final rarityCode = _rarityDigit(rarity);
-    // Clamp to 0..3 since we only have 4 variants (01, 11, 21, 31)
-    final clampedCode = int.parse(rarityCode).clamp(0, 3);
-    return 'assets/images/armor/armor_${clampedCode}1.webp';
+    return 'assets/images/armor/armor_${rarityCode}1.webp';
   }
 
   static String _ringImagePath(ItemRarity rarity, Random rnd) {
     final rarityCode = _rarityDigit(rarity);
-    final clampedCode = int.parse(rarityCode).clamp(0, 3);
-    return 'assets/images/rings/ring_${clampedCode}1.png';
+    return 'assets/images/rings/ring_${rarityCode}1.png';
   }
 
   static String _bootsImagePath(ItemRarity rarity, Random rnd) {
     final rarityCode = _rarityDigit(rarity);
-    final clampedCode = int.parse(rarityCode).clamp(0, 3);
-    return 'assets/images/boots/boots_${clampedCode}1.png';
+    return 'assets/images/boots/boots_${rarityCode}1.png';
   }
 
 
