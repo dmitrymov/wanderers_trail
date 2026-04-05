@@ -298,9 +298,6 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   String? _encounterBanner;
   Timer? _encounterBannerTimer;
 
-  /// >1 slows every swing so players can read attack timing (bars + countdown).
-  static const double _combatPaceScale = 1.42;
-
   /// Bumps on each hit the monster takes — drives recoil / HP flash animations.
   int _monsterHitVersion = 0;
 
@@ -388,8 +385,10 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     });
   }
 
-  int _scaleCombatMs(int ms) =>
-      (ms * _combatPaceScale).round().clamp(560, 3200);
+  int _scaleCombatMs(int ms, GameState gs) {
+    final mult = gs.profile.speedMultiplier.clamp(0.01, 2.0);
+    return (ms / mult).round();
+  }
 
   /// Seconds until the scheduled automatic hit (for UI countdown).
   double _secondsUntilNextHit(DateTime? next) {
@@ -531,8 +530,8 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     if (_monster == null) return;
     _monsterHitVersion = 0;
     context.read<GameState>().setCombatActive(true);
-    _playerIntervalMs = _scaleCombatMs(_calcPlayerIntervalMs(gs));
-    _monsterIntervalMs = _scaleCombatMs(_monster!.attackMs);
+    _playerIntervalMs = _scaleCombatMs(_calcPlayerIntervalMs(gs), gs);
+    _monsterIntervalMs = _scaleCombatMs(_monster!.attackMs, gs);
     final now = DateTime.now();
     _nextPlayerHit = now.add(Duration(milliseconds: _playerIntervalMs));
     _nextMonsterHit = now.add(Duration(milliseconds: _monsterIntervalMs));
@@ -869,7 +868,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     final agility = _sumStat(gs, ItemStatType.agility);
     final agilityBonus = (agility * 10).round();
     final raw = (base - weaponBonus - agilityBonus).clamp(400, 2000);
-    final mult = gs.attackSpeedMultiplier <= 0 ? 1.0 : gs.attackSpeedMultiplier;
+    final mult = gs.blessingAttackSpeedMultiplier;
     final adjusted = (raw / mult).round();
     return adjusted.clamp(400, 2000);
   }
@@ -910,7 +909,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     // Stack up to a reasonable cap to avoid infinite growth
     _poisonTicksRemaining = (_poisonTicksRemaining + ticks).clamp(0, 15);
     _poisonDamagePerTick = damagePerTick;
-    _poisonIntervalMs = _scaleCombatMs(intervalMs);
+    _poisonIntervalMs = _scaleCombatMs(intervalMs, context.read<GameState>());
     final now = DateTime.now();
     _nextPoisonTick =
         (_nextPoisonTick == null || now.isAfter(_nextPoisonTick!))
@@ -1543,8 +1542,27 @@ class _InventoryBar extends StatelessWidget {
 
   Color _rarityColor(ItemRarity? r) => Color(rarityColorValue(r));
 
-  String _assetForItem(Item item) =>
-      item.imageAsset ?? 'assets/images/items/${item.type.name}.png';
+  String _assetForItem(Item item) {
+    final path = item.imageAsset;
+    // If null or points to deprecated 'items' folder, use new fallback logic
+    if (path == null || path.contains('/items/')) {
+      final type = item.type.name;
+      String folder;
+      if (type == 'weapon') {
+        folder = 'weapons';
+      } else if (type == 'ring') {
+        folder = 'rings';
+      } else {
+        folder = type; // armor, boots
+      }
+      final ext = (type == 'armor' || type == 'boots') ? 'webp' : 'png';
+
+      // Use a known existing file as the universal base fallback for each type
+      if (type == 'weapon') return 'assets/images/weapons/dagger_01.png';
+      return 'assets/images/$folder/${type}_01.$ext';
+    }
+    return path;
+  }
 
   void _showItemDetails(BuildContext context, String label, Item item) {
     final color = _rarityColor(item.rarity);

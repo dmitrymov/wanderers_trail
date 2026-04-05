@@ -174,9 +174,11 @@ class Item {
       case ItemType.weapon:
         return _weaponImagePath(rarity, rnd);
       case ItemType.armor:
+        return _armorImagePath(rarity, rnd);
       case ItemType.ring:
+        return _ringImagePath(rarity, rnd);
       case ItemType.boots:
-        return null; // use generic icons for non-weapon items
+        return _bootsImagePath(rarity, rnd);
     }
   }
 
@@ -195,6 +197,21 @@ class Item {
     final rarityCode = _rarityDigit(rarity);
     final id = rnd.nextInt(10); // 0..9 id suffix
     return 'assets/images/weapons/${cat}_$rarityCode$id.png';
+  }
+
+  static String _armorImagePath(ItemRarity rarity, Random rnd) {
+    final rarityCode = _rarityDigit(rarity);
+    return 'assets/images/armor/armor_${rarityCode}1.webp';
+  }
+
+  static String _ringImagePath(ItemRarity rarity, Random rnd) {
+    final rarityCode = _rarityDigit(rarity);
+    return 'assets/images/rings/ring_${rarityCode}1.png';
+  }
+
+  static String _bootsImagePath(ItemRarity rarity, Random rnd) {
+    final rarityCode = _rarityDigit(rarity);
+    return 'assets/images/boots/boots_${rarityCode}1.png';
   }
 
 

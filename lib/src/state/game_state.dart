@@ -45,8 +45,10 @@ class GameState extends ChangeNotifier {
   double _blessStaminaRegenMul = 1.0; // >1 means more regen
   bool get isBlessActive =>
       _blessUntil != null && DateTime.now().isBefore(_blessUntil!);
+  double get blessingAttackSpeedMultiplier =>
+      isBlessActive ? _blessAttackSpeedMul : 1.0;
   double get attackSpeedMultiplier =>
-      (isBlessActive ? _blessAttackSpeedMul : 1.0) * profile.speedMultiplier;
+      blessingAttackSpeedMultiplier * profile.speedMultiplier;
   double get staminaRegenMultiplier =>
       isBlessActive ? _blessStaminaRegenMul : 1.0;
   int get blessRemainingSeconds {
@@ -88,7 +90,7 @@ class GameState extends ChangeNotifier {
     permStaminaLevel: 0,
     permAttackLevel: 0,
     permDefenseLevel: 0,
-    speedMultiplier: 1.0,
+    speedMultiplier: 0.1,
   );
 
   // Upgrade config

@@ -174,7 +174,7 @@ class PlayerProfile {
         permStaminaLevel: 0,
         permAttackLevel: 0,
         permDefenseLevel: 0,
-        speedMultiplier: 1.0,
+        speedMultiplier: 0.1,
         savedStep: null,
       );
 }
