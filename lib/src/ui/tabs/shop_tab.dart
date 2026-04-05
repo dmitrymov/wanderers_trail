@@ -1,32 +1,62 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../state/game_state.dart';
+import '../theme/tokens.dart';
 
 class ShopTab extends StatelessWidget {
   const ShopTab({super.key});
 
-  Widget _upgradeTile({required String title, required String subtitle, required int cost, required VoidCallback? onPressed}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                Text(subtitle),
-              ],
+  Widget _upgradeCard(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required int cost,
+    required VoidCallback? onPressed,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(AppTokens.gap16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: scheme.primaryContainer.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(AppTokens.r8),
+              ),
+              child: Icon(Icons.trending_up, color: scheme.onPrimaryContainer),
             ),
-          ),
-          const SizedBox(width: 12),
-          ElevatedButton(
-            onPressed: onPressed,
-            child: Text('Buy ($cost 💎)'),
-          ),
-        ],
+            const SizedBox(width: AppTokens.gap12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppTokens.gap8),
+            FilledButton(
+              onPressed: onPressed,
+              child: Text('$cost 💎'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -34,6 +64,7 @@ class ShopTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final gs = context.watch<GameState>();
+    final scheme = Theme.of(context).colorScheme;
 
     final healthLevel = gs.permHealthLevel;
     final staminaLevel = gs.permStaminaLevel;
@@ -49,62 +80,98 @@ class ShopTab extends StatelessWidget {
     final defenseCost = gs.permanentUpgradeCost(PermanentUpgrade.defense);
 
     return ListView(
-      padding: const EdgeInsets.only(top: 8, bottom: 24),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              const Expanded(
-                child: Text('Shop', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: Text('Shop', style: Theme.of(context).textTheme.titleLarge)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: scheme.secondaryContainer.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(999),
               ),
-              const Text('💎', style: TextStyle(fontSize: 18)),
-              const SizedBox(width: 6),
-              Text('${gs.diamonds}', style: const TextStyle(fontWeight: FontWeight.bold)),
-            ],
-          ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('💎', style: TextStyle(fontSize: 16, height: 1, color: scheme.onSecondaryContainer)),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${gs.diamonds}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      color: scheme.onSecondaryContainer,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text('Coins: ${gs.profile.coins}'),
+        const SizedBox(height: 6),
+        Text(
+          'Coins (this run): ${gs.profile.coins}',
+          style: Theme.of(context).textTheme.bodySmall,
         ),
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: OutlinedButton(
+        if (kDebugMode) ...[
+          const SizedBox(height: AppTokens.gap12),
+          OutlinedButton.icon(
             onPressed: () => gs.addDiamonds(50),
-            child: const Text('Add 50 Diamonds (test) 💎'),
+            icon: const Icon(Icons.bug_report_outlined, size: 18),
+            label: const Text('Add 50 diamonds (debug)'),
           ),
+        ],
+        const SizedBox(height: AppTokens.gap16),
+        Text(
+          'Permanent upgrades',
+          style: Theme.of(context).textTheme.titleMedium,
         ),
-        const Divider(height: 24),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Text('Permanent Upgrades (persist across runs)', style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(
+          'These persist across new runs.',
+          style: Theme.of(context).textTheme.bodySmall,
         ),
-        const SizedBox(height: 8),
-        _upgradeTile(
-          title: 'Max Health +${GameState.permHealthStep}',
-          subtitle: 'Level $healthLevel • Permanent bonus: +$healthBonus',
+        const SizedBox(height: AppTokens.gap12),
+        _upgradeCard(
+          context,
+          title: 'Max health +${GameState.permHealthStep}',
+          subtitle: 'Level $healthLevel · bonus +$healthBonus',
           cost: healthCost,
-          onPressed: gs.diamonds >= healthCost ? () => gs.purchasePermanent(PermanentUpgrade.health) : null,
+          onPressed: gs.diamonds >= healthCost
+              ? () => gs.purchasePermanent(PermanentUpgrade.health)
+              : null,
         ),
-        _upgradeTile(
-          title: 'Max Stamina +${GameState.permStaminaStep}',
-          subtitle: 'Level $staminaLevel • Permanent bonus: +$staminaBonus',
+        const SizedBox(height: AppTokens.gap8),
+        _upgradeCard(
+          context,
+          title: 'Max stamina +${GameState.permStaminaStep}',
+          subtitle: 'Level $staminaLevel · bonus +$staminaBonus',
           cost: staminaCost,
-          onPressed: gs.diamonds >= staminaCost ? () => gs.purchasePermanent(PermanentUpgrade.stamina) : null,
+          onPressed: gs.diamonds >= staminaCost
+              ? () => gs.purchasePermanent(PermanentUpgrade.stamina)
+              : null,
         ),
-        _upgradeTile(
+        const SizedBox(height: AppTokens.gap8),
+        _upgradeCard(
+          context,
           title: 'Attack +${GameState.permAttackStep}',
-          subtitle: 'Level $attackLevel • Applies to base attack',
+          subtitle: 'Level $attackLevel · adds to base attack',
           cost: attackCost,
-          onPressed: gs.diamonds >= attackCost ? () => gs.purchasePermanent(PermanentUpgrade.attack) : null,
+          onPressed: gs.diamonds >= attackCost
+              ? () => gs.purchasePermanent(PermanentUpgrade.attack)
+              : null,
         ),
-        _upgradeTile(
+        const SizedBox(height: AppTokens.gap8),
+        _upgradeCard(
+          context,
           title: 'Defense +${GameState.permDefenseStep}',
-          subtitle: 'Level $defenseLevel • Applies to base defense',
+          subtitle: 'Level $defenseLevel · adds to base defense',
           cost: defenseCost,
-          onPressed: gs.diamonds >= defenseCost ? () => gs.purchasePermanent(PermanentUpgrade.defense) : null,
+          onPressed: gs.diamonds >= defenseCost
+              ? () => gs.purchasePermanent(PermanentUpgrade.defense)
+              : null,
         ),
       ],
     );

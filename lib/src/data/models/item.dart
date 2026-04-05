@@ -197,11 +197,6 @@ class Item {
     return 'assets/images/weapons/${cat}_$rarityCode$id.png';
   }
 
-  // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
-
-  // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
-
-  // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
 
   static ItemRarity _rollRarity(Random rnd) {
     final p = rnd.nextDouble();

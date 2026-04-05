@@ -2,101 +2,62 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/models/item.dart';
+import '../../data/models/item_display_helpers.dart';
 import '../../state/game_state.dart';
+import '../theme/tokens.dart';
 
 class CharacterTab extends StatelessWidget {
   const CharacterTab({super.key});
 
+  Widget _equipLine(BuildContext context, String label, Item? item) {
+    final scheme = Theme.of(context).colorScheme;
+    final muted = scheme.onSurface.withValues(alpha: 0.65);
+    final subtle = scheme.onSurface.withValues(alpha: 0.45);
 
-
-  Color _rarityColor(ItemRarity? r) {
-    switch (r) {
-      case ItemRarity.uncommon:
-        return Colors.green;
-      case ItemRarity.rare:
-        return Colors.blue;
-      case ItemRarity.legendary:
-        return const Color(0xFFFFD700);
-      case ItemRarity.mystic:
-        return Colors.redAccent;
-      case ItemRarity.normal:
-      default:
-        return Colors.white70;
+    if (item == null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Text('$label: —', style: TextStyle(color: subtle, fontSize: 14)),
+      );
     }
+    final color = Color(rarityColorValue(item.rarity));
+    final base = itemBaseStat(item);
+    final extras = item.stats.entries
+        .map((e) => '• ${formatStatEntry(e.key, e.value)}')
+        .join('  ');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$label: ${item.name}',
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(base, style: TextStyle(fontSize: 13, color: muted)),
+          if (extras.isNotEmpty)
+            Text(extras, style: TextStyle(fontSize: 12, color: subtle)),
+        ],
+      ),
+    );
   }
 
-  Widget _equipLine(String label, Item? item) {
-    if (item == null) {
-      return Text('$label: -');
-    }
-    final color = _rarityColor(item.rarity);
-    // Build additional stat lines
-    final extras = item.stats.entries.map((e) {
-      final t = e.key;
-      final v = e.value;
-      String name;
-      bool percent = false;
-      switch (t) {
-        case ItemStatType.attack:
-          name = 'Attack';
-          break;
-        case ItemStatType.defense:
-          name = 'Defense';
-          break;
-        case ItemStatType.accuracy:
-          name = 'Accuracy';
-          percent = true;
-          break;
-        case ItemStatType.agility:
-          name = 'Agility';
-          break;
-        case ItemStatType.critChance:
-          name = 'Crit Chance';
-          percent = true;
-          break;
-        case ItemStatType.critDamage:
-          name = 'Crit Damage';
-          percent = true;
-          break;
-        case ItemStatType.health:
-          name = 'Health';
-          break;
-        case ItemStatType.evasion:
-          name = 'Evasion';
-          percent = true;
-          break;
-        case ItemStatType.stamina:
-          name = 'Stamina';
-          break;
-        case ItemStatType.staminaCostReduction:
-          name = 'Stamina Cost Reduction';
-          percent = true;
-          break;
-      }
-      final val = percent ? '+${(v * 100).toStringAsFixed(0)}%' : '+${v.toStringAsFixed(v % 1 == 0 ? 0 : 1)}';
-      return '• $name $val';
-    }).join('  ');
-
-    final base = () {
-      switch (item.type) {
-        case ItemType.weapon:
-          return 'Attack +${item.power}';
-        case ItemType.armor:
-          return 'Defense +${item.power}';
-        case ItemType.ring:
-          return 'Accuracy +${item.power}';
-        case ItemType.boots:
-          return 'Defense +${item.power}';
-      }
-    }();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('$label: ${item.name}', style: TextStyle(color: color)),
-        Text(base, style: const TextStyle(fontSize: 12)),
-        if (extras.isNotEmpty) Text(extras, style: const TextStyle(fontSize: 12)),
-      ],
+  Widget _sectionCard(BuildContext context, {required List<Widget> children}) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(AppTokens.gap16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        ),
+      ),
     );
   }
 
@@ -104,98 +65,220 @@ class CharacterTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final gs = context.watch<GameState>();
     final p = gs.profile;
+    final scheme = Theme.of(context).colorScheme;
+    final muted = scheme.onSurface.withValues(alpha: 0.7);
 
-    return gs.assetsReady
-        ? ListView(
-      padding: const EdgeInsets.all(16),
+    if (!gs.assetsReady) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        const Text('Character', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+        Text('Character', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 16),
-        Row(
+        _sectionCard(
+          context,
           children: [
-            const Expanded(child: Text('Coins:')),
             Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.monetization_on, color: Colors.amber),
-                const SizedBox(width: 4),
-                Text('${p.coins}'),
+                Icon(Icons.account_balance_wallet_outlined,
+                    size: 22, color: scheme.primary),
+                const SizedBox(width: 10),
+                Text('Wallet', style: Theme.of(context).textTheme.titleMedium),
+                const Spacer(),
+                Icon(Icons.monetization_on, color: Colors.amber.shade600, size: 22),
+                const SizedBox(width: 6),
+                Text(
+                  '${p.coins}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppTokens.gap16),
+            _upgradeRow(
+              context,
+              label: 'Health',
+              value: '${p.health}/${p.maxHealth}',
+              buttonLabel:
+                  'Upgrade +${GameState.healthUpgradeStep} (${gs.healthUpgradeCost}🪙)',
+              enabled: p.coins >= gs.healthUpgradeCost,
+              onPressed: () => gs.upgradeHealth(),
+            ),
+            const SizedBox(height: AppTokens.gap12),
+            _upgradeRow(
+              context,
+              label: 'Stamina',
+              value: '${p.stamina}/${p.maxStamina}',
+              buttonLabel:
+                  'Upgrade +${GameState.staminaUpgradeStep} (${gs.staminaUpgradeCost}🪙)',
+              enabled: p.coins >= gs.staminaUpgradeCost,
+              onPressed: () => gs.upgradeStamina(),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppTokens.gap12),
+        _sectionCard(
+          context,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.shield_outlined, size: 22, color: scheme.primary),
+                const SizedBox(width: 10),
+                Text('Equipment', style: Theme.of(context).textTheme.titleMedium),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Tap items in battle to inspect stats.',
+              style: TextStyle(fontSize: 12, color: muted),
+            ),
+            const Divider(height: AppTokens.gap24),
+            _equipLine(context, 'Weapon', p.weapon),
+            _equipLine(context, 'Armor', p.armor),
+            _equipLine(context, 'Ring', p.ring),
+            _equipLine(context, 'Boots', p.boots),
+          ],
+        ),
+        const SizedBox(height: AppTokens.gap12),
+        _sectionCard(
+          context,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.analytics_outlined, size: 22, color: scheme.primary),
+                const SizedBox(width: 10),
+                Text(
+                  'Combat summary',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppTokens.gap12),
+            _statRow(context, Icons.flash_on, 'Attack', '${gs.statsSummary.attack}'),
+            _statRow(context, Icons.shield, 'Defense', '${gs.statsSummary.defense}'),
+            _statRow(
+              context,
+              Icons.speed,
+              'Attack speed',
+              '${gs.statsSummary.attackMs} ms',
+            ),
+            _statRow(
+              context,
+              Icons.center_focus_weak,
+              'Accuracy',
+              '${(gs.statsSummary.accuracy * 100).toStringAsFixed(0)}%',
+            ),
+            _statRow(
+              context,
+              Icons.shield_moon,
+              'Evasion',
+              '${(gs.statsSummary.evasion * 100).toStringAsFixed(0)}%',
+            ),
+            _statRow(
+              context,
+              Icons.star,
+              'Crit chance',
+              '${(gs.statsSummary.critChance * 100).toStringAsFixed(1)}%',
+            ),
+            _statRow(
+              context,
+              Icons.auto_graph,
+              'Crit damage',
+              '+${(gs.statsSummary.critDamage * 100).toStringAsFixed(0)}%',
+            ),
+            _statRow(context, Icons.bar_chart, 'DPS', '${gs.statsSummary.dps}'),
+          ],
+        ),
+        const SizedBox(height: AppTokens.gap12),
+        _sectionCard(
+          context,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.emoji_events_outlined,
+                    color: Colors.amber.shade700, size: 22),
+                const SizedBox(width: 10),
+                Text('Progress', style: Theme.of(context).textTheme.titleMedium),
+              ],
+            ),
+            const SizedBox(height: AppTokens.gap8),
+            Row(
+              children: [
+                Text('High score (best step)', style: TextStyle(color: muted)),
+                const Spacer(),
+                Tooltip(
+                  message: 'Highest step reached on any run',
+                  child: Text(
+                    '${p.highScore}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
               ],
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            const Expanded(child: Text('Health:')),
-            Text('${p.health}/${p.maxHealth}'),
-            const SizedBox(width: 12),
-            ElevatedButton(
-              onPressed: (p.coins >= gs.healthUpgradeCost)
-                  ? () => gs.upgradeHealth()
-                  : null,
-              child: Text('Upgrade +${GameState.healthUpgradeStep} (${gs.healthUpgradeCost} coins)'),
-            ),
-          ],
+      ],
+    );
+  }
+
+  Widget _upgradeRow(
+    BuildContext context, {
+    required String label,
+    required String value,
+    required String buttonLabel,
+    required bool enabled,
+    required VoidCallback onPressed,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            const Expanded(child: Text('Stamina:')),
-            Text('${p.stamina}/${p.maxStamina}'),
-            const SizedBox(width: 12),
-            ElevatedButton(
-              onPressed: (p.coins >= gs.staminaUpgradeCost)
-                  ? () => gs.upgradeStamina()
-                  : null,
-              child: Text('Upgrade +${GameState.staminaUpgradeStep} (${gs.staminaUpgradeCost} coins)'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        const Divider(),
-        const Text('Equipment', style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        _equipLine('Weapon', p.weapon),
-        _equipLine('Armor', p.armor),
-        _equipLine('Ring', p.ring),
-        _equipLine('Boots', p.boots),
-        const SizedBox(height: 16),
-        const Divider(),
-        const Text('Computed Stats', style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Text('Attack: ${gs.statsSummary.attack}'),
-        Text('Defense: ${gs.statsSummary.defense}'),
-        Row(children: [
-          const Icon(Icons.bolt, size: 16), const SizedBox(width: 6), Text('Attack Speed: ${gs.statsSummary.attackMs} ms')
-        ]),
-        Row(children: [
-          const Icon(Icons.center_focus_weak, size: 16), const SizedBox(width: 6), Text('Accuracy: ${(gs.statsSummary.accuracy * 100).toStringAsFixed(0)}%')
-        ]),
-        Row(children: [
-          const Icon(Icons.shield_moon, size: 16), const SizedBox(width: 6), Text('Evasion: ${(gs.statsSummary.evasion * 100).toStringAsFixed(0)}%')
-        ]),
-        Row(children: [
-          const Icon(Icons.star, size: 16), const SizedBox(width: 6), Text('Crit Chance: ${(gs.statsSummary.critChance * 100).toStringAsFixed(1)}%')
-        ]),
-        Row(children: [
-          const Icon(Icons.auto_graph, size: 16), const SizedBox(width: 6), Text('Crit Damage: +${(gs.statsSummary.critDamage * 100).toStringAsFixed(0)}%')
-        ]),
-        Text('DPS: ${gs.statsSummary.dps}'),
-        const SizedBox(height: 16),
-        const Divider(),
-        Row(
-          children: [
-            const Text('High Score:'),
-            const SizedBox(width: 8),
-            Tooltip(
-              message: 'Highest step reached (best run)',
-              child: Text('${p.highScore}'),
-            ),
-          ],
+        const SizedBox(width: AppTokens.gap8),
+        Flexible(
+          child: FilledButton(
+            onPressed: enabled ? onPressed : null,
+            child: Text(buttonLabel, textAlign: TextAlign.center),
+          ),
         ),
       ],
-    )
-        : const Center(child: CircularProgressIndicator());
+    );
+  }
+
+  Widget _statRow(BuildContext context, IconData icon, String label, String value) {
+    final scheme = Theme.of(context).colorScheme;
+    final muted = scheme.onSurface.withValues(alpha: 0.55);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: muted),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.75)),
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
   }
 }

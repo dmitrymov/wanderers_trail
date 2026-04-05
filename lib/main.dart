@@ -17,6 +17,7 @@ import 'src/data/repositories/local_game_repository.dart';
 import 'src/data/repositories/firestore_game_repository.dart';
 import 'src/state/game_state.dart';
 import 'src/ui/tabs/battle_tab.dart';
+import 'src/ui/tabs/character_tab.dart';
 import 'src/ui/tabs/pet_tab.dart';
 import 'src/ui/tabs/shop_tab.dart';
 
@@ -59,6 +60,7 @@ class WanderersApp extends StatelessWidget {
       title: "Wanderer's Trail",
       theme: buildAppTheme(Brightness.light),
       darkTheme: buildAppTheme(Brightness.dark),
+      themeMode: ThemeMode.system,
       home: const HomeScaffold(),
     );
   }
@@ -72,30 +74,69 @@ class HomeScaffold extends StatefulWidget {
 }
 
 class _HomeScaffoldState extends State<HomeScaffold> {
-  int _index = 2; // Default to Battle tab.
+  int _index = 2; // Default to Battle tab (0=Shop, 1=Character, 2=Battle, 3=Pet).
 
   final _pages = const [
     ShopTab(),
-    // CharacterTab(),
+    CharacterTab(),
     BattleTab(),
     PetTab(),
   ];
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      body: SafeArea(child: _pages[_index]),
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color.lerp(
+                    scheme.primaryContainer,
+                    scheme.surface,
+                    isDark ? 0.72 : 0.55,
+                  ) ??
+                  scheme.surface,
+              scheme.surface,
+            ],
+            stops: const [0.0, 0.42],
+          ),
+        ),
+        child: SafeArea(
+          child: IndexedStack(
+            index: _index,
+            children: _pages,
+          ),
+        ),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.storefront), label: 'Shop'),
-          // NavigationDestination(icon: Icon(Icons.person), label: 'Character'),
           NavigationDestination(
-            icon: Icon(Icons.sports_esports),
+            icon: Icon(Icons.storefront_outlined),
+            selectedIcon: Icon(Icons.storefront),
+            label: 'Shop',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Character',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.sports_esports_outlined),
+            selectedIcon: Icon(Icons.sports_esports),
             label: 'Battle',
           ),
-          NavigationDestination(icon: Icon(Icons.pets), label: 'Pet'),
+          NavigationDestination(
+            icon: Icon(Icons.pets_outlined),
+            selectedIcon: Icon(Icons.pets),
+            label: 'Pet',
+          ),
         ],
       ),
     );

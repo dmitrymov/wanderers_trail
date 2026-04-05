@@ -349,8 +349,8 @@ class GameState extends ChangeNotifier {
     try {
       final p = profile;
       await repo.saveProfile(p);
-    } catch (_) {
-      // ignore for now
+    } catch (e, st) {
+      debugPrint('[GameState] _persist failed: $e\n$st');
     }
   }
 

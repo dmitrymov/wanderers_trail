@@ -12,7 +12,7 @@ class StatBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pct = (value / max).clamp(0.0, 1.0);
-    final bg = Theme.of(context).colorScheme.onSurface.withOpacity(0.12);
+    final bg = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,

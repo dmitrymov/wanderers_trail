@@ -17,7 +17,7 @@ class OverlayService {
               constraints: const BoxConstraints(maxWidth: 320),
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.85),
+                  color: Colors.black.withValues(alpha: 0.85),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Padding(

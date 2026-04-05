@@ -17,7 +17,7 @@ class Panel extends StatelessWidget {
       margin: margin,
       decoration: BoxDecoration(
         // Dark scrim-style background for reliable contrast on bright scenes
-        color: Colors.black.withOpacity(AppTokens.panelOpacity),
+        color: Colors.black.withValues(alpha: AppTokens.panelOpacity),
         borderRadius: BorderRadius.circular(AppTokens.r12),
         border: Border.all(color: Colors.white24),
       ),

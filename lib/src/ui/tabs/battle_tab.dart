@@ -6,7 +6,9 @@ import 'package:provider/provider.dart';
 
 import '../../state/game_state.dart';
 import '../../data/models/item.dart';
+import '../../data/models/item_display_helpers.dart';
 
+import '../theme/tokens.dart';
 import '../widgets/item_drop_popup.dart';
 import '../widgets/panel.dart';
 import '../widgets/stat_bar.dart';
@@ -21,80 +23,188 @@ class BattleTab extends StatelessWidget {
     final gs = context.watch<GameState>();
     final resumeStep = (gs.profile.highScore ~/ 50) * 50;
     final canContinue = (gs.profile.savedStep ?? 0) > 0;
-    return Center(
-      child: ElevatedButton(
-        onPressed: () async {
-          final choice = await showDialog<_StartChoice>(
-            context: context,
-            builder: (ctx) {
-              return AlertDialog(
-                title: const Text('Start Journey'),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (canContinue)
-                      Text(
-                        'Continue from Step ${gs.profile.savedStep} (keep equipment)',
-                      ),
-                    if (resumeStep >= 50)
-                      Text(
-                        'Resume checkpoint: Step $resumeStep (keep equipment)',
-                      ),
-                    const Text('New Run: Step 0 (equipment reset)'),
-                  ],
-                ),
-                actions: [
-                  if (canContinue)
-                    TextButton(
-                      onPressed:
-                          () => Navigator.of(ctx).pop(_StartChoice.continueRun),
-                      child: const Text('Continue'),
-                    ),
-                  TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(_StartChoice.newRun),
-                    child: const Text('New Run'),
-                  ),
-                  if (resumeStep >= 50)
-                    ElevatedButton(
-                      onPressed:
-                          () => Navigator.of(ctx).pop(_StartChoice.resume),
-                      child: Text('Resume $resumeStep'),
-                    ),
-                ],
-              );
-            },
-          );
+    final scheme = Theme.of(context).colorScheme;
+    final muted = scheme.onSurface.withValues(alpha: 0.72);
 
-          if (choice == null) return;
-          if (choice == _StartChoice.newRun) {
-            gs.resetForNewRun();
-            // Ensure equipment is cleared before entering battle
-            // ignore: use_build_context_synchronously
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const ActiveBattlePage(initialStep: 0),
+    Future<void> openStartDialog() async {
+      final choice = await showDialog<_StartChoice>(
+        context: context,
+        builder: (ctx) {
+          return AlertDialog(
+            title: const Text('Start journey'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (canContinue)
+                  Text(
+                    'Continue from step ${gs.profile.savedStep} (equipment kept).',
+                  ),
+                if (resumeStep >= 50)
+                  Text(
+                    'Resume checkpoint: step $resumeStep (equipment kept).',
+                  ),
+                const Text('New run: step 0 (equipment reset).'),
+              ],
+            ),
+            actions: [
+              if (canContinue)
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(_StartChoice.continueRun),
+                  child: const Text('Continue'),
+                ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(_StartChoice.newRun),
+                child: const Text('New run'),
               ),
-            );
-          } else if (choice == _StartChoice.resume) {
-            gs.prepareForCheckpointRun();
-            // ignore: use_build_context_synchronously
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => ActiveBattlePage(initialStep: resumeStep),
-              ),
-            );
-          } else if (choice == _StartChoice.continueRun) {
-            final step = gs.profile.savedStep ?? 0;
-            // ignore: use_build_context_synchronously
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => ActiveBattlePage(initialStep: step),
-              ),
-            );
-          }
+              if (resumeStep >= 50)
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(_StartChoice.resume),
+                  child: Text('Resume $resumeStep'),
+                ),
+            ],
+          );
         },
-        child: const Text('Start'),
+      );
+
+      if (choice == null || !context.mounted) return;
+      if (choice == _StartChoice.newRun) {
+        gs.resetForNewRun();
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const ActiveBattlePage(initialStep: 0),
+          ),
+        );
+      } else if (choice == _StartChoice.resume) {
+        gs.prepareForCheckpointRun();
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ActiveBattlePage(initialStep: resumeStep),
+          ),
+        );
+      } else if (choice == _StartChoice.continueRun) {
+        final step = gs.profile.savedStep ?? 0;
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ActiveBattlePage(initialStep: step),
+          ),
+        );
+      }
+    }
+
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppTokens.gap24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(AppTokens.gap24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Icon(
+                    Icons.route_rounded,
+                    size: 56,
+                    color: scheme.primary,
+                  ),
+                  const SizedBox(height: AppTokens.gap16),
+                  Text(
+                    'The trail',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: AppTokens.gap8),
+                  Text(
+                    'Advance steps, survive encounters, beat your high score, '
+                    'and collect gear along the way.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: muted,
+                          height: 1.4,
+                        ),
+                  ),
+                  const SizedBox(height: AppTokens.gap24),
+                  Row(
+                    children: [
+                      _HubStatChip(
+                        icon: Icons.emoji_events_outlined,
+                        label: 'Best',
+                        value: '${gs.profile.highScore}',
+                      ),
+                      const SizedBox(width: AppTokens.gap8),
+                      _HubStatChip(
+                        icon: Icons.flag_outlined,
+                        label: 'Saved',
+                        value: canContinue
+                            ? '${gs.profile.savedStep}'
+                            : '—',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppTokens.gap24),
+                  FilledButton.icon(
+                    onPressed: openStartDialog,
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: const Text('Start journey'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HubStatChip extends StatelessWidget {
+  const _HubStatChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.gap12,
+          vertical: AppTokens.gap12,
+        ),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHigh.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(AppTokens.r12),
+          border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.6)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 22, color: scheme.primary),
+            const SizedBox(width: AppTokens.gap8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  Text(
+                    value,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -181,6 +291,16 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   final List<_LogEntry> _logs = [];
   final ScrollController _logScrollController = ScrollController();
 
+  /// Longer intervals so attacks / timers are easier to read (gameplay pacing).
+  static const double _combatPaceScale = 1.6;
+
+  /// After both you and the enemy resolve an attack, log HP lost this exchange.
+  int _exchangeRound = 1;
+  int _dmgToMonsterThisExchange = 0;
+  int _dmgToPlayerThisExchange = 0;
+  bool _playerResolvedExchange = false;
+  bool _monsterResolvedExchange = false;
+
   // Power Strike
   final _shakeKey = GlobalKey<ShakeWidgetState>();
   DateTime? _lastPowerStrike;
@@ -209,22 +329,25 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
       Colors.orangeAccent,
     );
 
-    // Float
     _floats.add(
       _DamageFloat(
         text: '$finalDamage (Power!)',
         color: Colors.orange,
         start: DateTime.now(),
-        duration: const Duration(milliseconds: 1000),
+        duration: const Duration(milliseconds: 1500),
         xFrac: 0.5,
         yFrac: 0.3,
-        rise: 50,
+        rise: 56,
+        punch: true,
+        fontSize: 26,
       ),
     );
 
     setState(() {
       _monster = _monster!.hit(finalDamage);
     });
+
+    _notePlayerDamageToMonster(finalDamage);
 
     // Reset player attack timer to give instant gratification (attack now, then wait usual interval)
     _nextPlayerHit = DateTime.now().add(
@@ -252,6 +375,56 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
         );
       }
     });
+  }
+
+  int _scaleCombatMs(int ms) =>
+      (ms * _combatPaceScale).round().clamp(650, 3400);
+
+  void _resetExchangeRoundTracking() {
+    _exchangeRound = 1;
+    _dmgToMonsterThisExchange = 0;
+    _dmgToPlayerThisExchange = 0;
+    _playerResolvedExchange = false;
+    _monsterResolvedExchange = false;
+  }
+
+  void _onPlayerAttackResolved(int damageToMonster) {
+    if (_monster == null) return;
+    _playerResolvedExchange = true;
+    _dmgToMonsterThisExchange += damageToMonster;
+    _tryFinishExchangeRound();
+  }
+
+  /// Extra player damage (e.g. Power Strike) before the enemy acts this exchange.
+  void _notePlayerDamageToMonster(int damageToMonster) {
+    if (_monster == null) return;
+    if (_playerResolvedExchange && !_monsterResolvedExchange) {
+      _dmgToMonsterThisExchange += damageToMonster;
+      return;
+    }
+    _onPlayerAttackResolved(damageToMonster);
+  }
+
+  void _onMonsterAttackResolved(int damageToPlayer) {
+    if (_monster == null) return;
+    _monsterResolvedExchange = true;
+    _dmgToPlayerThisExchange += damageToPlayer;
+    _tryFinishExchangeRound();
+  }
+
+  void _tryFinishExchangeRound() {
+    if (!_playerResolvedExchange || !_monsterResolvedExchange) return;
+    final m = _monster;
+    if (m == null) return;
+    _log(
+      'Round $_exchangeRound · ${m.name} −$_dmgToMonsterThisExchange HP · You −$_dmgToPlayerThisExchange HP',
+      Colors.cyanAccent,
+    );
+    _exchangeRound++;
+    _dmgToMonsterThisExchange = 0;
+    _dmgToPlayerThisExchange = 0;
+    _playerResolvedExchange = false;
+    _monsterResolvedExchange = false;
   }
 
   @override
@@ -330,8 +503,8 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     _stopCombat();
     if (_monster == null) return;
     context.read<GameState>().setCombatActive(true);
-    _playerIntervalMs = _calcPlayerIntervalMs(gs);
-    _monsterIntervalMs = _monster!.attackMs;
+    _playerIntervalMs = _scaleCombatMs(_calcPlayerIntervalMs(gs));
+    _monsterIntervalMs = _scaleCombatMs(_monster!.attackMs);
     final now = DateTime.now();
     _nextPlayerHit = now.add(Duration(milliseconds: _playerIntervalMs));
     _nextMonsterHit = now.add(Duration(milliseconds: _monsterIntervalMs));
@@ -374,10 +547,12 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
               text: isCrit ? '-$damage!' : '-$damage',
               color: isCrit ? Colors.yellowAccent : Colors.greenAccent,
               start: now,
-              duration: const Duration(milliseconds: 800),
+              duration: const Duration(milliseconds: 1400),
               xFrac: fx,
               yFrac: 0.24,
-              rise: isCrit ? 44 : 36,
+              rise: isCrit ? 52 : 44,
+              punch: true,
+              fontSize: isCrit ? 26 : 23,
             ),
           );
           // Reduce by monster defense
@@ -386,7 +561,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
 
           if (isCrit) {
             _log(
-              'Criticsl hit on ${_monster!.name} for $finalDamage!',
+              'Critical hit on ${_monster!.name} for $finalDamage!',
               Colors.yellowAccent,
             );
           } else {
@@ -396,6 +571,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           setState(() {
             _monster = _monster!.hit(finalDamage);
           });
+          _onPlayerAttackResolved(finalDamage);
           if (_monster!.hp <= 0) {
             _onMonsterDefeated(gs);
             return;
@@ -406,15 +582,18 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           _log('You missed ${_monster!.name}.', Colors.white38);
           _floats.add(
             _DamageFloat(
-              text: 'miss',
-              color: Colors.white,
+              text: 'MISS',
+              color: Colors.white70,
               start: now,
-              duration: const Duration(milliseconds: 600),
+              duration: const Duration(milliseconds: 1000),
               xFrac: fx,
               yFrac: 0.24,
-              rise: 26,
+              rise: 28,
+              punch: false,
+              fontSize: 20,
             ),
           );
+          _onPlayerAttackResolved(0);
         }
       }
       if (_nextMonsterHit != null && now.isAfter(_nextMonsterHit!)) {
@@ -424,6 +603,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
         final hitChance = (accBase - playerEvasion + 0.75).clamp(0.05, 0.98);
         final hit = _rnd.nextDouble() < hitChance;
         _nextMonsterHit = now.add(Duration(milliseconds: _monsterIntervalMs));
+        var monsterSwingDamage = 0;
         if (hit) {
           int raw = 2 + (_step ~/ 5) + _rnd.nextInt(3);
           if (_monster!.type == MonsterType.slime) {
@@ -436,6 +616,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           }
           final defense = _calcPlayerDefense(gs);
           final dmg = _reduceByDefense(raw, defense);
+          monsterSwingDamage = dmg;
           // Spawn damage float near player HUD
           final fx = 0.15 + (_rnd.nextDouble() - 0.5) * 0.12;
           _floats.add(
@@ -443,10 +624,12 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
               text: '-$dmg',
               color: Colors.redAccent,
               start: now,
-              duration: const Duration(milliseconds: 800),
+              duration: const Duration(milliseconds: 1400),
               xFrac: fx,
               yFrac: 0.08,
-              rise: 30,
+              rise: 38,
+              punch: true,
+              fontSize: 24,
             ),
           );
           gs.loseHealth(dmg);
@@ -524,16 +707,19 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
             final chance = (base + per * _monster!.tier).clamp(base, maxChance);
             if (_rnd.nextDouble() < chance) {
               final extra = max(1, (dmg * dmgFactor).round());
+              monsterSwingDamage += extra;
               final fx3 = 0.18 + (_rnd.nextDouble() - 0.5) * 0.12;
               _floats.add(
                 _DamageFloat(
                   text: '-$extra',
                   color: Colors.redAccent,
                   start: now,
-                  duration: const Duration(milliseconds: 600),
+                  duration: const Duration(milliseconds: 1200),
                   xFrac: fx3,
                   yFrac: 0.1,
-                  rise: 16,
+                  rise: 30,
+                  punch: true,
+                  fontSize: 22,
                 ),
               );
               gs.loseHealth(extra);
@@ -541,17 +727,24 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
               _shakeKey.currentState?.shake();
             }
           }
-          // // Bandit: steals coins at higher tiers
-          // if (_monster!.type == MonsterType.bandit) {
-          //   final base = gs.cfgInt(['bandit','coin_steal','base'], 1);
-          //   final per = gs.cfgInt(['bandit','coin_steal','per_tier'], 2);
-          //   final maxSt = gs.cfgInt(['bandit','coin_steal','max'], 50);
-          //   final int steal = max(base, min(maxSt, base + _monster!.tier * per)).toInt();
-          //   final int taken = (gs.profile.coins >= steal) ? steal : gs.profile.coins;
-          //   if (taken > 0) {
-          //     gs.addCoins(-taken);
-          //   }
-          // }
+          // Bandit: steals coins at higher tiers
+          if (_monster!.type == MonsterType.bandit) {
+            final base = gs.cfgInt(['bandit', 'coin_steal', 'base'], 1);
+            final per = gs.cfgInt(['bandit', 'coin_steal', 'per_tier'], 2);
+            final maxSt = gs.cfgInt(['bandit', 'coin_steal', 'max'], 50);
+            final int steal =
+                max(base, min(maxSt, base + _monster!.tier * per)).toInt();
+            final int taken =
+                (gs.profile.coins >= steal) ? steal : gs.profile.coins;
+            if (taken > 0) {
+              gs.addCoins(-taken);
+              _log(
+                'Bandit stole $taken coins!',
+                Colors.orangeAccent,
+              );
+            }
+          }
+          _onMonsterAttackResolved(monsterSwingDamage);
           if (gs.profile.health <= 0) {
             gs.setCombatActive(false);
             _stopCombat();
@@ -564,15 +757,18 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           _log('You evaded ${_monster!.name} attack.', Colors.lightBlueAccent);
           _floats.add(
             _DamageFloat(
-              text: 'evade',
-              color: Colors.white,
+              text: 'EVADE',
+              color: Colors.lightBlueAccent,
               start: now,
-              duration: const Duration(milliseconds: 600),
+              duration: const Duration(milliseconds: 1000),
               xFrac: fx,
               yFrac: 0.08,
-              rise: 20,
+              rise: 26,
+              punch: false,
+              fontSize: 20,
             ),
           );
+          _onMonsterAttackResolved(0);
         }
       }
       // Poison damage over time on player
@@ -620,6 +816,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     _nextPoisonTick = null;
     _poisonTicksRemaining = 0;
     _poisonDamagePerTick = 0;
+    _resetExchangeRoundTracking();
   }
 
   int _calcPlayerIntervalMs(GameState gs) {
@@ -671,7 +868,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     // Stack up to a reasonable cap to avoid infinite growth
     _poisonTicksRemaining = (_poisonTicksRemaining + ticks).clamp(0, 15);
     _poisonDamagePerTick = damagePerTick;
-    _poisonIntervalMs = intervalMs;
+    _poisonIntervalMs = _scaleCombatMs(intervalMs);
     final now = DateTime.now();
     _nextPoisonTick =
         (_nextPoisonTick == null || now.isAfter(_nextPoisonTick!))
@@ -890,6 +1087,12 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
                                   'Step: $_step',
                                   style: const TextStyle(color: Colors.white),
                                 ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '| Best: ${gs.profile.highScore}',
+                                  style: const TextStyle(
+                                      color: Colors.white54, fontSize: 12),
+                                ),
                                 const SizedBox(width: 12),
                                 const Icon(
                                   Icons.monetization_on,
@@ -1040,30 +1243,40 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
                               f.yFrac * 2 - 1,
                             );
                             final now = DateTime.now();
-                            final p = (now.difference(f.start).inMilliseconds /
+                            final rawP = (now.difference(f.start).inMilliseconds /
                                     f.duration.inMilliseconds)
                                 .clamp(0.0, 1.0);
-                            final dy = -f.rise * p;
-                            final opacity = 1 - p;
+                            final moveP = Curves.easeOut.transform(rawP);
+                            final dy = -f.rise * moveP;
+                            final opacity = (1 - Curves.easeIn.transform(rawP))
+                                .clamp(0.0, 1.0);
+                            final punchT = (rawP / 0.2).clamp(0.0, 1.0);
+                            final punchScale = f.punch
+                                ? 1.32 - 0.32 * Curves.easeOut.transform(punchT)
+                                : 1.0;
                             return Align(
                               alignment: align,
                               child: Opacity(
                                 opacity: opacity,
                                 child: Transform.translate(
                                   offset: Offset(0, dy),
-                                  child: Text(
-                                    f.text,
-                                    style: TextStyle(
-                                      color: f.color,
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      shadows: const [
-                                        Shadow(
-                                          blurRadius: 4,
-                                          color: Colors.black,
-                                          offset: Offset(1, 1),
-                                        ),
-                                      ],
+                                  child: Transform.scale(
+                                    scale: punchScale,
+                                    child: Text(
+                                      f.text,
+                                      style: TextStyle(
+                                        color: f.color,
+                                        fontSize: f.fontSize,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: f.punch ? 0.3 : 0,
+                                        shadows: const [
+                                          Shadow(
+                                            blurRadius: 6,
+                                            color: Colors.black87,
+                                            offset: Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1084,7 +1297,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
                   ),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
+                      color: Colors.black.withValues(alpha: 0.6),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.white24),
                     ),
@@ -1168,71 +1381,12 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
 }
 
 class _InventoryBar extends StatelessWidget {
-  Color _rarityColor(ItemRarity? r) {
-    switch (r) {
-      case ItemRarity.uncommon:
-        return Colors.green;
-      case ItemRarity.rare:
-        return Colors.blue;
-      case ItemRarity.legendary:
-        return const Color(0xFFFFD700);
-      case ItemRarity.mystic:
-        return Colors.redAccent;
-      case ItemRarity.normal:
-      default:
-        return Colors.white24;
-    }
-  }
+  String _statLine(ItemStatType t, double v) => formatStatEntry(t, v);
 
-  String _assetForItem(Item item) {
-    // Prefer per-item image asset if provided; otherwise fallback by type
-    return item.imageAsset ?? 'assets/images/items/${item.type.name}.png';
-  }
+  Color _rarityColor(ItemRarity? r) => Color(rarityColorValue(r));
 
-  String _statLine(ItemStatType t, double v) {
-    String label;
-    bool percent = false;
-    switch (t) {
-      case ItemStatType.attack:
-        label = 'Attack';
-        break;
-      case ItemStatType.defense:
-        label = 'Defense';
-        break;
-      case ItemStatType.accuracy:
-        label = 'Accuracy';
-        percent = true;
-        break;
-      case ItemStatType.agility:
-        label = 'Agility';
-        break;
-      case ItemStatType.critChance:
-        label = 'Crit Chance';
-        percent = true;
-        break;
-      case ItemStatType.critDamage:
-        label = 'Crit Damage';
-        percent = true;
-        break;
-      case ItemStatType.health:
-        label = 'Health';
-        break;
-      case ItemStatType.evasion:
-        label = 'Evasion';
-        percent = true;
-        break;
-      case ItemStatType.stamina:
-        label = 'Stamina';
-        break;
-      case ItemStatType.staminaCostReduction:
-        label = 'Stamina Cost Reduction';
-        percent = true;
-        break;
-    }
-    return percent
-        ? '$label +${(v * 100).toStringAsFixed(0)}%'
-        : '$label +${v.toStringAsFixed(v % 1 == 0 ? 0 : 1)}';
-  }
+  String _assetForItem(Item item) =>
+      item.imageAsset ?? 'assets/images/items/${item.type.name}.png';
 
   void _showItemDetails(BuildContext context, String label, Item item) {
     final color = _rarityColor(item.rarity);
@@ -1332,7 +1486,7 @@ class _InventoryBar extends StatelessWidget {
           child: Container(
             height: 90,
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: _rarityColor(item?.rarity)),
             ),
@@ -1466,6 +1620,8 @@ class _DamageFloat {
   final double xFrac; // 0..1 across width
   final double yFrac; // 0..1 across height
   final double rise; // pixels upward
+  final bool punch; // brief pop scale for hits
+  final double fontSize;
   _DamageFloat({
     required this.text,
     required this.color,
@@ -1474,6 +1630,8 @@ class _DamageFloat {
     required this.xFrac,
     required this.yFrac,
     required this.rise,
+    this.punch = false,
+    this.fontSize = 21,
   });
 }
 
