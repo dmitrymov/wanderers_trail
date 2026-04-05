@@ -141,6 +141,38 @@ class CharacterTab extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppTokens.gap12),
+        if (gs.selectedPet != null) ...[
+          _sectionCard(
+            context,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.pets, size: 22, color: scheme.primary),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Companion',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                gs.selectedPet!.name,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  color: scheme.primary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                gs.selectedPet!.description,
+                style: TextStyle(fontSize: 13, color: muted),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTokens.gap12),
+        ],
         _sectionCard(
           context,
           children: [

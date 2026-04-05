@@ -42,6 +42,47 @@ class StatsSummary {
     );
   }
 
+  /// Companion bonuses (flat attack/defense, fractional accuracy / evasion / crit).
+  static StatsSummary withPetBonuses(
+    StatsSummary base, {
+    int attackBonus = 0,
+    int defenseBonus = 0,
+    double accuracyBonus = 0,
+    double evasionBonus = 0,
+    double critChanceBonus = 0,
+    double critDamageBonus = 0,
+  }) {
+    if (attackBonus == 0 &&
+        defenseBonus == 0 &&
+        accuracyBonus == 0 &&
+        evasionBonus == 0 &&
+        critChanceBonus == 0 &&
+        critDamageBonus == 0) {
+      return base;
+    }
+    final atk = (base.attack + attackBonus).clamp(1, 1000000);
+    final def = (base.defense + defenseBonus).clamp(0, 1000000);
+    final accuracy = base.accuracy + accuracyBonus;
+    final evasion = base.evasion + evasionBonus;
+    final critChance =
+        (base.critChance + critChanceBonus).clamp(0.0, 0.95).toDouble();
+    final critDamage = base.critDamage + critDamageBonus;
+    final hitChance = (0.8 + accuracy).clamp(0.1, 0.98);
+    final expectedPerHit = atk * (1 + critChance * critDamage);
+    final hitsPerSecond = 1000.0 / base.attackMs;
+    final dps = expectedPerHit * hitChance * hitsPerSecond;
+    return StatsSummary(
+      attack: atk.toInt(),
+      defense: def.toInt(),
+      accuracy: accuracy,
+      evasion: evasion,
+      critChance: critChance,
+      critDamage: critDamage,
+      attackMs: base.attackMs,
+      dps: double.parse(dps.toStringAsFixed(1)),
+    );
+  }
+
   static const int baseDamage = 5;
 
   static StatsSummary fromItems({Item? weapon, Item? armor, Item? ring, Item? boots}) {

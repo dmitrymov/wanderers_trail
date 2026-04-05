@@ -281,6 +281,9 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
 
   final List<_DamageFloat> _floats = [];
 
+  /// Attack timers + floating damage: repaint only this listener’s builders (not the whole page).
+  final ValueNotifier<int> _combatRepaint = ValueNotifier(0);
+
   // Poison effect tracking
   DateTime? _nextPoisonTick;
   int _poisonTicksRemaining = 0;
@@ -291,8 +294,12 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   final List<_LogEntry> _logs = [];
   final ScrollController _logScrollController = ScrollController();
 
-  /// Longer intervals so attacks / timers are easier to read (gameplay pacing).
-  static const double _combatPaceScale = 1.6;
+  /// Short on-screen notice when an encounter starts.
+  String? _encounterBanner;
+  Timer? _encounterBannerTimer;
+
+  /// 1.0 matches original combat speed. Use ~1.08 if you want slightly calmer fights (was 1.6 and felt sluggish).
+  static const double _combatPaceScale = 1.0;
 
   /// After both you and the enemy resolve an attack, log HP lost this exchange.
   int _exchangeRound = 1;
@@ -378,7 +385,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   }
 
   int _scaleCombatMs(int ms) =>
-      (ms * _combatPaceScale).round().clamp(650, 3400);
+      (ms * _combatPaceScale).round().clamp(400, 2000);
 
   void _resetExchangeRoundTracking() {
     _exchangeRound = 1;
@@ -425,6 +432,15 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     _dmgToPlayerThisExchange = 0;
     _playerResolvedExchange = false;
     _monsterResolvedExchange = false;
+  }
+
+  void _showEncounterBanner(String monsterName) {
+    _encounterBannerTimer?.cancel();
+    _encounterBanner = monsterName;
+    _encounterBannerTimer = Timer(const Duration(milliseconds: 2800), () {
+      if (!mounted) return;
+      setState(() => _encounterBanner = null);
+    });
   }
 
   @override
@@ -500,7 +516,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   }
 
   void _startCombat(GameState gs) {
-    _stopCombat();
+    _stopCombat(notify: false);
     if (_monster == null) return;
     context.read<GameState>().setCombatActive(true);
     _playerIntervalMs = _scaleCombatMs(_calcPlayerIntervalMs(gs));
@@ -508,6 +524,11 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     final now = DateTime.now();
     _nextPlayerHit = now.add(Duration(milliseconds: _playerIntervalMs));
     _nextMonsterHit = now.add(Duration(milliseconds: _monsterIntervalMs));
+    _combatRepaint.value++;
+
+    final encounterName = _monster!.name;
+    _log('Attacked by $encounterName!', Colors.orangeAccent);
+    _showEncounterBanner(encounterName);
 
     _combatTimer = Timer.periodic(const Duration(milliseconds: 100), (t) {
       if (!mounted || _monster == null) {
@@ -802,12 +823,19 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
       }
       // Cleanup expired floats
       _floats.removeWhere((f) => now.difference(f.start) > f.duration);
-      // Always repaint to update progress bars smoothly and show floats.
-      if (mounted) setState(() {});
+      // Localized repaint: avoid rebuilding background + scaffold every tick.
+      if (mounted && (_monster != null || _floats.isNotEmpty)) {
+        _combatRepaint.value++;
+      }
     });
   }
 
-  void _stopCombat() {
+  void _stopCombat({bool notify = true}) {
+    final needsFrame =
+        _encounterBanner != null || _encounterBannerTimer != null || _combatTimer != null;
+    _encounterBannerTimer?.cancel();
+    _encounterBannerTimer = null;
+    _encounterBanner = null;
     _combatTimer?.cancel();
     _combatTimer = null;
     _nextPlayerHit = null;
@@ -817,6 +845,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     _poisonTicksRemaining = 0;
     _poisonDamagePerTick = 0;
     _resetExchangeRoundTracking();
+    if (notify && needsFrame && mounted) setState(() {});
   }
 
   int _calcPlayerIntervalMs(GameState gs) {
@@ -1021,7 +1050,8 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   void dispose() {
     // Mark combat inactive on leave (just in case)
     _gsRef?.setCombatActive(false);
-    _stopCombat();
+    _stopCombat(notify: false);
+    _combatRepaint.dispose();
     super.dispose();
   }
 
@@ -1062,13 +1092,54 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
             children: [
               // Background path image (using existing asset for now)
               Positioned.fill(
-                child: Image.asset(
-                  'assets/images/backgrounds/battle_bg.png',
-                  fit: BoxFit.cover,
-                  errorBuilder:
-                      (context, error, stack) => Container(color: Colors.black),
+                child: RepaintBoundary(
+                  child: Image.asset(
+                    'assets/images/backgrounds/battle_bg.png',
+                    fit: BoxFit.cover,
+                    errorBuilder:
+                        (context, error, stack) =>
+                            Container(color: Colors.black),
+                  ),
                 ),
               ),
+              if (_encounterBanner != null)
+                Positioned(
+                  top: 8,
+                  left: 12,
+                  right: 12,
+                  child: Material(
+                    color: Colors.black.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(12),
+                    elevation: 6,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.warning_amber_rounded,
+                            color: Colors.orangeAccent,
+                            size: 28,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Attacked by $_encounterBanner!',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               // HUDs (top and enemy) stacked vertically in SafeArea so enemy HUD starts under HP/Stamina HUD
               SafeArea(
                 child: Padding(
@@ -1155,71 +1226,82 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
                           ],
                         ),
                       ),
-                      if (_monster != null) ...[
-                        const SizedBox(height: 12),
-                        Panel(
-                          child: Column(
+                      ValueListenableBuilder<int>(
+                        valueListenable: _combatRepaint,
+                        builder: (context, _, __) {
+                          final m = _monster;
+                          if (m == null) return const SizedBox.shrink();
+                          return Column(
                             mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Text(
-                                _monster!.name,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              SizedBox(
-                                width: 96,
-                                height: 96,
-                                child: Image.asset(
-                                  _monster!.imageAsset,
-                                  fit: BoxFit.contain,
-                                  errorBuilder:
-                                      (c, e, s) => const Icon(
-                                        Icons.pest_control,
-                                        color: Colors.white54,
-                                        size: 64,
-                                      ),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              _MonsterHpBar(
-                                current: _monster!.hp,
-                                max: _monster!.maxHp,
-                              ),
-                              const SizedBox(height: 8),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24.0,
-                                ),
+                              const SizedBox(height: 12),
+                              Panel(
                                 child: Column(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    _AttackProgressBar(
-                                      label: 'You',
-                                      value: _progressTo(
-                                        _nextPlayerHit,
-                                        _playerIntervalMs,
+                                    Text(
+                                      m.name,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
                                       ),
-                                      color: Colors.green,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      width: 96,
+                                      height: 96,
+                                      child: Image.asset(
+                                        m.imageAsset,
+                                        fit: BoxFit.contain,
+                                        errorBuilder:
+                                            (c, e, s) => const Icon(
+                                              Icons.pest_control,
+                                              color: Colors.white54,
+                                              size: 64,
+                                            ),
+                                      ),
                                     ),
                                     const SizedBox(height: 6),
-                                    _AttackProgressBar(
-                                      label: _monster!.name,
-                                      value: _progressTo(
-                                        _nextMonsterHit,
-                                        _monsterIntervalMs,
+                                    _MonsterHpBar(
+                                      current: m.hp,
+                                      max: m.maxHp,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 24.0,
                                       ),
-                                      color: Colors.redAccent,
+                                      child: Column(
+                                        children: [
+                                          _AttackProgressBar(
+                                            label: 'You',
+                                            value: _progressTo(
+                                              _nextPlayerHit,
+                                              _playerIntervalMs,
+                                            ),
+                                            color: Colors.green,
+                                          ),
+                                          const SizedBox(height: 6),
+                                          _AttackProgressBar(
+                                            label: m.name,
+                                            value: _progressTo(
+                                              _nextMonsterHit,
+                                              _monsterIntervalMs,
+                                            ),
+                                            color: Colors.redAccent,
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ],
                                 ),
                               ),
                             ],
-                          ),
-                        ),
-                      ],
+                          );
+                        },
+                      ),
                       Expanded(
                         child: _BattleLogList(
                           logs: _logs,
@@ -1231,59 +1313,74 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
                   ),
                 ),
               ),
-              // Floating damage numbers overlay
-              if (_floats.isNotEmpty)
+              // Floating damage numbers overlay (isolated repaints via [_combatRepaint])
+              if (_monster != null || _floats.isNotEmpty)
                 Positioned.fill(
-                  child: IgnorePointer(
-                    child: Stack(
-                      children:
-                          _floats.map((f) {
-                            final align = Alignment(
-                              f.xFrac * 2 - 1,
-                              f.yFrac * 2 - 1,
-                            );
-                            final now = DateTime.now();
-                            final rawP = (now.difference(f.start).inMilliseconds /
-                                    f.duration.inMilliseconds)
-                                .clamp(0.0, 1.0);
-                            final moveP = Curves.easeOut.transform(rawP);
-                            final dy = -f.rise * moveP;
-                            final opacity = (1 - Curves.easeIn.transform(rawP))
-                                .clamp(0.0, 1.0);
-                            final punchT = (rawP / 0.2).clamp(0.0, 1.0);
-                            final punchScale = f.punch
-                                ? 1.32 - 0.32 * Curves.easeOut.transform(punchT)
-                                : 1.0;
-                            return Align(
-                              alignment: align,
-                              child: Opacity(
-                                opacity: opacity,
-                                child: Transform.translate(
-                                  offset: Offset(0, dy),
-                                  child: Transform.scale(
-                                    scale: punchScale,
-                                    child: Text(
-                                      f.text,
-                                      style: TextStyle(
-                                        color: f.color,
-                                        fontSize: f.fontSize,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: f.punch ? 0.3 : 0,
-                                        shadows: const [
-                                          Shadow(
-                                            blurRadius: 6,
-                                            color: Colors.black87,
-                                            offset: Offset(0, 2),
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: _combatRepaint,
+                    builder: (context, _, __) {
+                      if (_floats.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      return IgnorePointer(
+                        child: Stack(
+                          children:
+                              _floats.map((f) {
+                                final align = Alignment(
+                                  f.xFrac * 2 - 1,
+                                  f.yFrac * 2 - 1,
+                                );
+                                final now = DateTime.now();
+                                final rawP =
+                                    (now.difference(f.start).inMilliseconds /
+                                            f.duration.inMilliseconds)
+                                        .clamp(0.0, 1.0);
+                                final moveP =
+                                    Curves.easeOut.transform(rawP);
+                                final dy = -f.rise * moveP;
+                                final opacity =
+                                    (1 - Curves.easeIn.transform(rawP))
+                                        .clamp(0.0, 1.0);
+                                final punchT =
+                                    (rawP / 0.2).clamp(0.0, 1.0);
+                                final punchScale = f.punch
+                                    ? 1.32 -
+                                        0.32 *
+                                            Curves.easeOut.transform(punchT)
+                                    : 1.0;
+                                return Align(
+                                  alignment: align,
+                                  child: Opacity(
+                                    opacity: opacity,
+                                    child: Transform.translate(
+                                      offset: Offset(0, dy),
+                                      child: Transform.scale(
+                                        scale: punchScale,
+                                        child: Text(
+                                          f.text,
+                                          style: TextStyle(
+                                            color: f.color,
+                                            fontSize: f.fontSize,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing:
+                                                f.punch ? 0.3 : 0,
+                                            shadows: const [
+                                              Shadow(
+                                                blurRadius: 6,
+                                                color: Colors.black87,
+                                                offset: Offset(0, 2),
+                                              ),
+                                            ],
                                           ),
-                                        ],
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                    ),
+                                );
+                              }).toList(),
+                        ),
+                      );
+                    },
                   ),
                 ),
               // Bottom inventory + advance button

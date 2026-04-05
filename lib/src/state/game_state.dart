@@ -26,6 +26,7 @@ class GameState extends ChangeNotifier {
   // Cached stats summary (recomputed when equipped item IDs change)
   StatsSummary? _statsCache;
   String? _cacheWeaponId, _cacheArmorId, _cacheRingId, _cacheBootsId;
+  String? _cachePetId;
   int _cachePermAttackLevel = -1, _cachePermDefenseLevel = -1;
 
   // Asset readiness flag
@@ -152,6 +153,7 @@ class GameState extends ChangeNotifier {
 
   void selectPet(String petId) {
     _profile = profile.copyWith(selectedPetId: petId);
+    _invalidateStatsCache();
     notifyListeners();
     _persist();
   }
@@ -314,6 +316,7 @@ class GameState extends ChangeNotifier {
     Item? armor,
     Item? ring,
     Item? boots,
+    Pet? petForBonuses,
   }) {
     final base = StatsSummary.fromItems(
       weapon: weapon,
@@ -321,10 +324,21 @@ class GameState extends ChangeNotifier {
       ring: ring,
       boots: boots,
     );
-    return StatsSummary.withBonuses(
+    final withPerm = StatsSummary.withBonuses(
       base,
       attackBonus: permAttackLevel * permAttackStep,
       defenseBonus: permDefenseLevel * permDefenseStep,
+    );
+    final pet = petForBonuses ?? selectedPet;
+    if (pet == null) return withPerm;
+    return StatsSummary.withPetBonuses(
+      withPerm,
+      attackBonus: pet.attackBonus,
+      defenseBonus: pet.defenseBonus,
+      accuracyBonus: pet.accuracyBonus,
+      evasionBonus: pet.evasionBonus,
+      critChanceBonus: pet.critChanceBonus,
+      critDamageBonus: pet.critDamageBonus,
     );
   }
 
@@ -360,6 +374,7 @@ class GameState extends ChangeNotifier {
     _cacheArmorId = null;
     _cacheRingId = null;
     _cacheBootsId = null;
+    _cachePetId = null;
     _cachePermAttackLevel = -1;
     _cachePermDefenseLevel = -1;
   }
@@ -528,12 +543,14 @@ class GameState extends ChangeNotifier {
     final a = profile.armor?.id;
     final r = profile.ring?.id;
     final b = profile.boots?.id;
+    final petId = profile.selectedPetId;
     final dirty =
         _statsCache == null ||
         w != _cacheWeaponId ||
         a != _cacheArmorId ||
         r != _cacheRingId ||
         b != _cacheBootsId ||
+        petId != _cachePetId ||
         _cachePermAttackLevel != permAttackLevel ||
         _cachePermDefenseLevel != permDefenseLevel;
     if (dirty) {
@@ -548,11 +565,23 @@ class GameState extends ChangeNotifier {
         attackBonus: permAttackLevel * permAttackStep,
         defenseBonus: permDefenseLevel * permDefenseStep,
       );
-      _statsCache = withPerm;
+      final pet = selectedPet;
+      _statsCache = pet == null
+          ? withPerm
+          : StatsSummary.withPetBonuses(
+              withPerm,
+              attackBonus: pet.attackBonus,
+              defenseBonus: pet.defenseBonus,
+              accuracyBonus: pet.accuracyBonus,
+              evasionBonus: pet.evasionBonus,
+              critChanceBonus: pet.critChanceBonus,
+              critDamageBonus: pet.critDamageBonus,
+            );
       _cacheWeaponId = w;
       _cacheArmorId = a;
       _cacheRingId = r;
       _cacheBootsId = b;
+      _cachePetId = petId;
       _cachePermAttackLevel = permAttackLevel;
       _cachePermDefenseLevel = permDefenseLevel;
     }
