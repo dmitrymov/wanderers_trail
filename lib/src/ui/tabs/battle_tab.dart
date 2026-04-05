@@ -1956,7 +1956,7 @@ class _DamageFloat {
   });
 }
 
-enum MonsterType { slime, wolf, bandit, spider }
+enum MonsterType { slime, wolf, bandit, spider, skeleton, orc, ghost, demon }
 
 class Monster {
   final String name;
@@ -1994,7 +1994,6 @@ class Monster {
 
   static Monster randomForStep(GameState gs, int step, Random rnd) {
     final maxHp = 12 + (step ~/ 5);
-    final hp = maxHp;
     // Base 1000ms, adjust +/- up to 200ms, slightly faster as step increases
     final variance = rnd.nextInt(401) - 200; // -200..+200
     final faster = (step ~/ 15) * 50; // -0, -50, -100...
@@ -2007,18 +2006,72 @@ class Monster {
     final accVar = (rnd.nextDouble() - 0.5) * 0.1; // +/-0.05
     final accuracy = (accBase + accVar).clamp(0.4, 0.95);
 
-    const names = ['Slime', 'Wolf', 'Bandit', 'Spider'];
-    final name = names[rnd.nextInt(names.length)];
+    const names = [
+      'Slime',
+      'Wolf',
+      'Bandit',
+      'Spider',
+      'Skeleton',
+      'Skeleton Warrior',
+      'Orc',
+      'Orc Brute',
+      'Ghost',
+      'Ghost Wraith',
+      'Demon',
+      'Demon Lord'
+    ];
+    final String name = names[rnd.nextInt(names.length)];
     final type = switch (name) {
       'Slime' => MonsterType.slime,
       'Wolf' => MonsterType.wolf,
       'Bandit' => MonsterType.bandit,
       'Spider' => MonsterType.spider,
+      'Skeleton' || 'Skeleton Warrior' => MonsterType.skeleton,
+      'Orc' || 'Orc Brute' => MonsterType.orc,
+      'Ghost' || 'Ghost Wraith' => MonsterType.ghost,
+      'Demon' || 'Demon Lord' => MonsterType.demon,
       _ => MonsterType.slime,
     };
 
-    // Wolf attacks faster baseline
-    final attackMs = name == 'Wolf' ? (ms - 300).clamp(400, 2000) : ms;
+    // Calculate archetype adjustments
+    double hpMul = 1.0;
+    double defAdd = 0.0;
+    int msSpeedBonus = 0;
+    double accBonus = 0.0;
+
+    switch (type) {
+      case MonsterType.wolf:
+        msSpeedBonus = 300;
+        break;
+      case MonsterType.skeleton:
+        hpMul = 0.8;
+        defAdd = 5.0 + (step ~/ 12);
+        msSpeedBonus = -200; // Slow but armored
+        break;
+      case MonsterType.orc:
+        hpMul = 1.4 + (step * 0.005);
+        defAdd = 2.0;
+        msSpeedBonus = -100; // Tanky bruiser
+        break;
+      case MonsterType.ghost:
+        hpMul = 0.6;
+        accBonus = 0.15;
+        msSpeedBonus = 200; // Evasive glass cannon
+        break;
+      case MonsterType.demon:
+        hpMul = 1.2;
+        accBonus = 0.1;
+        msSpeedBonus = 350; // Elite threat
+        break;
+      default:
+        break;
+    }
+
+    final int finalMaxHp = (maxHp * hpMul).toInt();
+    final int finalHp = finalMaxHp;
+    final int finalAttackMs = (ms - msSpeedBonus).clamp(400, 2000);
+    final int finalDefense = (defense + defAdd).toInt();
+    final double finalAccuracy = (accuracy + accBonus).clamp(0.4, 0.98);
 
     // Difficulty index derived from monster stats (not step)
     final hpDiv = gs.cfgNum(['score_weights', 'hp_div'], 50.0);
@@ -2027,26 +2080,33 @@ class Monster {
     final accBias = gs.cfgNum(['score_weights', 'accuracy_bias'], 0.6);
     final accWeight = gs.cfgNum(['score_weights', 'accuracy_weight'], 5.0);
     final score =
-        (maxHp / hpDiv) +
-        (defense / defDiv) +
-        ((1200 - attackMs) / spdDiv) +
-        ((accuracy - accBias) * accWeight);
+        (finalMaxHp / hpDiv) +
+        (finalDefense / defDiv) +
+        ((1200 - finalAttackMs) / spdDiv) +
+        ((finalAccuracy - accBias) * accWeight);
     // Keep combat tier behavior derived from stats as before
     final int tierIndex =
         max(0, min(999, score.isNaN ? 0 : score.floor())).toInt();
     // Image variant based on checkpoints of 50 steps: 0.. for [0-49]=0, [50-99]=1, etc.
     final int imageIndex = (step ~/ 50);
-    final image = gs.pickEnemyImage(name, difficultyIndex: imageIndex);
+    // Use existing icons as placeholders for new types
+    final String assetSearchName = switch (type) {
+      MonsterType.skeleton || MonsterType.orc => 'Bandit',
+      MonsterType.ghost => 'Slime',
+      MonsterType.demon => 'Spider',
+      _ => name,
+    };
+    final image = gs.pickEnemyImage(assetSearchName, difficultyIndex: imageIndex);
 
     return Monster(
       name: name,
       type: type,
       tier: tierIndex,
-      hp: hp,
-      maxHp: maxHp,
-      attackMs: attackMs,
-      defense: defense,
-      accuracy: accuracy,
+      hp: finalHp,
+      maxHp: finalMaxHp,
+      attackMs: finalAttackMs,
+      defense: finalDefense,
+      accuracy: finalAccuracy,
       imageAsset: image,
     );
   }

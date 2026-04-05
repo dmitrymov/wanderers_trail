@@ -30,5 +30,9 @@
   },
   "bandit": {
     "coin_steal": { "base": 1, "per_tier": 2, "max": 50 }
-  }
+  },
+  "skeleton": {},
+  "orc": {},
+  "ghost": {},
+  "demon": {}
 }
