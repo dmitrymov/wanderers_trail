@@ -92,65 +92,135 @@ class BattleTab extends StatelessWidget {
       }
     }
 
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppTokens.gap24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(AppTokens.gap24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Icon(
-                    Icons.route_rounded,
-                    size: 56,
-                    color: scheme.primary,
-                  ),
-                  const SizedBox(height: AppTokens.gap16),
-                  Text(
-                    'The trail',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: AppTokens.gap8),
-                  Text(
-                    'Advance steps, survive encounters, beat your high score, '
-                    'and collect gear along the way.',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: muted,
-                          height: 1.4,
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            scheme.surface,
+            scheme.surfaceContainerHigh.withValues(alpha: 0.5),
+          ],
+        ),
+      ),
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: AppTokens.gap24, vertical: AppTokens.gap48),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Hero Visual
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 1000),
+                  curve: Curves.easeOutQuart,
+                  builder: (context, value, child) {
+                    return Opacity(
+                      opacity: value,
+                      child: Transform.translate(
+                        offset: Offset(0, 30 * (1 - value)),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: scheme.primaryContainer.withValues(alpha: 0.25),
+                      boxShadow: [
+                        BoxShadow(
+                          color: scheme.primary.withValues(alpha: 0.15),
+                          blurRadius: 40,
+                          spreadRadius: 8,
                         ),
+                      ],
+                    ),
+                    child: Icon(
+                      Icons.terrain_rounded,
+                      size: 72,
+                      color: scheme.primary,
+                    ),
                   ),
-                  const SizedBox(height: AppTokens.gap24),
-                  Row(
-                    children: [
-                      _HubStatChip(
-                        icon: Icons.emoji_events_outlined,
-                        label: 'Best',
-                        value: '${gs.profile.highScore}',
-                      ),
-                      const SizedBox(width: AppTokens.gap8),
-                      _HubStatChip(
-                        icon: Icons.flag_outlined,
-                        label: 'Saved',
-                        value: canContinue
-                            ? '${gs.profile.savedStep}'
-                            : '—',
-                      ),
-                    ],
+                ),
+                const SizedBox(height: AppTokens.gap32),
+                
+                // Title & Subtitle
+                Text(
+                  'The Wanderer\'s Trail',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.8,
+                    color: scheme.onSurface,
                   ),
-                  const SizedBox(height: AppTokens.gap24),
-                  FilledButton.icon(
+                ),
+                const SizedBox(height: AppTokens.gap12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppTokens.gap16),
+                  child: Text(
+                    'Forge your path through the unknown. Face the encounters, collect legendary gear, and survive the trail.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: muted,
+                      height: 1.5,
+                      letterSpacing: 0.1,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppTokens.gap48),
+                
+                // Stats HUD Section
+                Row(
+                  children: [
+                    _HubStatChip(
+                      icon: Icons.emoji_events_rounded,
+                      label: 'Record',
+                      value: '${gs.profile.highScore}',
+                      accent: Colors.amber,
+                    ),
+                    const SizedBox(width: AppTokens.gap12),
+                    _HubStatChip(
+                      icon: Icons.flag_circle_rounded,
+                      label: 'Last Point',
+                      value: canContinue ? 'Step ${gs.profile.savedStep}' : '—',
+                      accent: scheme.secondary,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppTokens.gap32),
+                
+                // Action Section
+                SizedBox(
+                  width: double.infinity,
+                  height: 64,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppTokens.r12 * 1.5),
+                      ),
+                      elevation: 12,
+                      shadowColor: scheme.primary.withValues(alpha: 0.35),
+                      backgroundColor: scheme.primary,
+                      foregroundColor: scheme.onPrimary,
+                    ),
                     onPressed: openStartDialog,
-                    icon: const Icon(Icons.play_arrow_rounded),
-                    label: const Text('Start journey'),
+                    icon: const Icon(Icons.explore_rounded, size: 28),
+                    label: const Text(
+                      'Begin Expedition',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -164,43 +234,53 @@ class _HubStatChip extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    required this.accent,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppTokens.gap12,
-          vertical: AppTokens.gap12,
-        ),
+        padding: const EdgeInsets.all(AppTokens.gap16),
         decoration: BoxDecoration(
-          color: scheme.surfaceContainerHigh.withValues(alpha: 0.85),
-          borderRadius: BorderRadius.circular(AppTokens.r12),
-          border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.6)),
+          color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(AppTokens.r12 * 1.5),
+          border: Border.all(
+            color: scheme.outlineVariant.withValues(alpha: 0.3),
+            width: 1.5,
+          ),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 22, color: scheme.primary),
-            const SizedBox(width: AppTokens.gap8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  Text(
-                    value,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ],
+            Container(
+              padding: const EdgeInsets.all(AppTokens.gap8),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(AppTokens.r8),
+              ),
+              child: Icon(icon, size: 20, color: accent),
+            ),
+            const SizedBox(height: AppTokens.gap12),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: scheme.onSurface.withValues(alpha: 0.6),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: AppTokens.gap4),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: scheme.onSurface,
               ),
             ),
           ],
@@ -220,7 +300,7 @@ class ActiveBattlePage extends StatefulWidget {
   State<ActiveBattlePage> createState() => _ActiveBattlePageState();
 }
 
-class _ActiveBattlePageState extends State<ActiveBattlePage> {
+class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProviderStateMixin {
   bool _leaveDialogOpen = false;
 
   void _requestLeave() {
@@ -272,6 +352,11 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   late final Random _rnd;
   GameState? _gsRef; // provider reference cached for use in dispose
 
+  // World Travel Animation
+  late final AnimationController _worldController;
+  double _worldOffset = 0.0;
+  double _lastWorldOffset = 0.0;
+
   // Auto-combat timing
   Timer? _combatTimer;
   DateTime? _nextPlayerHit;
@@ -290,6 +375,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
   int _poisonDamagePerTick = 0;
   int _poisonIntervalMs = 1000;
   bool _skeletonReassembled = false;
+  bool _monsterDying = false; // Phase 3: Death animation delay
 
   // Combat Log
   final List<_LogEntry> _logs = [];
@@ -368,9 +454,9 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     }
   }
 
-  void _log(String text, Color color) {
+  void _log(String text, Color color, {IconData? icon}) {
     setState(() {
-      _logs.add(_LogEntry(text, color));
+      _logs.add(_LogEntry(text, color, icon: icon));
       // Keep only last 50
       if (_logs.length > 50) _logs.removeAt(0);
     });
@@ -459,6 +545,13 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     super.initState();
     _rnd = Random();
     _step = widget.initialStep;
+    _worldOffset = _step.toDouble() * 200.0;
+    _lastWorldOffset = _worldOffset;
+    
+    _worldController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
   }
 
   @override
@@ -506,6 +599,9 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     // Move forward when no monster is present.
     setState(() {
       _step += 1;
+      _lastWorldOffset = _worldOffset;
+      _worldController.forward(from: 0.0);
+      
       // 35% chance to encounter a monster.
       if (_rnd.nextDouble() < 0.35) {
         _monster = Monster.randomForStep(gs, _step, _rnd);
@@ -531,6 +627,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     if (_monster == null) return;
     _monsterHitVersion = 0;
     _skeletonReassembled = false;
+    _monsterDying = false;
     context.read<GameState>().setCombatActive(true);
     _playerIntervalMs = _scaleCombatMs(_calcPlayerIntervalMs(gs), gs);
     _monsterIntervalMs = _scaleCombatMs(_monster!.attackMs, gs);
@@ -540,7 +637,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
     _combatRepaint.value++;
 
     final encounterName = _monster!.name;
-    _log('Attacked by $encounterName!', Colors.orangeAccent);
+    _log('Attacked by $encounterName!', Colors.orangeAccent, icon: Icons.warning_amber_rounded);
     _showEncounterBanner(encounterName);
 
     _combatTimer = Timer.periodic(const Duration(milliseconds: 100), (t) {
@@ -550,8 +647,11 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
       }
       final now = DateTime.now();
       // Safety: if somehow monster HP already 0, end immediately
-      if (_monster!.hp <= 0) {
-        _onMonsterDefeated(gs);
+      if (_monster!.hp <= 0 && !_monsterDying) {
+        setState(() => _monsterDying = true);
+        Future.delayed(const Duration(milliseconds: 600), () {
+          if (mounted) _onMonsterDefeated(gs);
+        });
         return;
       }
       if (_nextPlayerHit != null && now.isAfter(_nextPlayerHit!)) {
@@ -604,9 +704,10 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
             _log(
               'Critical hit on ${_monster!.name} for $finalDamage!',
               Colors.yellowAccent,
+              icon: Icons.auto_awesome,
             );
           } else {
-            _log('Hit ${_monster!.name} for $finalDamage.', Colors.greenAccent);
+            _log('Hit ${_monster!.name} for $finalDamage.', Colors.greenAccent, icon: Icons.colorize);
           }
 
           setState(() {
@@ -623,7 +724,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
                 final hpPct = gs.cfgNum(['skeleton', 'reassemble', 'hp_percent'], 0.35);
                 final heal = (_monster!.maxHp * hpPct).toInt();
                 _monster = _monster!.hit(-heal); // Heal back
-                _log('Skeleton reassembled with $heal HP!', Colors.white);
+                _log('Skeleton reassembled with $heal HP!', Colors.white, icon: Icons.refresh);
                 OverlayService.showToast('Skeleton rattling back to life!');
                 // Spawn "REVIVE" float
                 _floats.add(
@@ -642,14 +743,17 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
                 return; // Continue combat
               }
             }
-            _onMonsterDefeated(gs);
+            setState(() => _monsterDying = true);
+            Future.delayed(const Duration(milliseconds: 600), () {
+              if (mounted) _onMonsterDefeated(gs);
+            });
             return;
           }
         } else {
           // Miss or Evaded float
           final fx = 0.5 + (_rnd.nextDouble() - 0.5) * 0.18;
           final msg = evaded ? 'EVADED' : 'MISS';
-          _log('You ${evaded ? "were evaded by" : "missed"} ${_monster!.name}.', Colors.white38);
+          _log('You ${evaded ? "were evaded by" : "missed"} ${_monster!.name}.', Colors.white38, icon: Icons.close);
           _floats.add(
             _DamageFloat(
               text: msg,
@@ -699,7 +803,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           final dmg = _reduceByDefense(raw, finalDef);
           monsterSwingDamage = dmg;
           if (crushed) {
-            _log('Orc CRUSHING BLOW ignored some defense!', Colors.orangeAccent);
+            _log('Orc CRUSHING BLOW ignored some defense!', Colors.orangeAccent, icon: Icons.gavel);
             _floats.add(
               _DamageFloat(
                 text: 'CRUSH',
@@ -729,7 +833,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
             ),
           );
           gs.loseHealth(dmg);
-          _log('${_monster!.name} hit you for $dmg.', Colors.redAccent);
+          _log('${_monster!.name} hit you for $dmg.', Colors.redAccent, icon: Icons.bolt);
           _shakeKey.currentState?.shake();
           if (_monster!.type == MonsterType.spider) {
             final t = _monster!.tier;
@@ -819,7 +923,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
                 ),
               );
               gs.loseHealth(extra);
-              _log('Wolf double claw hit for $extra!', Colors.redAccent);
+              _log('Wolf double claw hit for $extra!', Colors.redAccent, icon: Icons.bolt);
               _shakeKey.currentState?.shake();
             }
           }
@@ -837,6 +941,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
               _log(
                 'Bandit stole $taken coins!',
                 Colors.orangeAccent,
+                icon: Icons.monetization_on,
               );
             }
           }
@@ -848,7 +953,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
             setState(() {
               _monster = _monster!.hit(-heal); // Heal
             });
-            _log('Demon lifestole $heal HP!', Colors.redAccent);
+            _log('Demon lifestole $heal HP!', Colors.redAccent, icon: Icons.favorite);
             _floats.add(
               _DamageFloat(
                 text: '+$heal',
@@ -872,7 +977,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
         } else {
           // Player evaded
           final fx = 0.15 + (_rnd.nextDouble() - 0.5) * 0.12;
-          _log('You evaded ${_monster!.name} attack.', Colors.lightBlueAccent);
+          _log('You evaded ${_monster!.name} attack.', Colors.lightBlueAccent, icon: Icons.shield);
           _floats.add(
             _DamageFloat(
               text: 'EVADE',
@@ -908,7 +1013,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
           ),
         );
         gs.loseHealth(pdmg);
-        _log('Poison deals $pdmg damage.', Colors.purpleAccent);
+        _log('Poison deals $pdmg damage.', Colors.purpleAccent, icon: Icons.medical_services);
         _shakeKey.currentState?.shake();
         _poisonTicksRemaining -= 1;
         if (gs.profile.health <= 0) {
@@ -1023,7 +1128,10 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
       ); //TODO: now its displayed in middle of item drop popup
     }
     final drop = gs.maybeDrop(runScore: _step);
-    setState(() => _monster = null);
+    setState(() {
+      _monster = null;
+      _monsterDying = false;
+    });
     gs.setCombatActive(false);
     _stopCombat();
     if (drop != null && mounted) {
@@ -1145,10 +1253,13 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
 
   @override
   void dispose() {
-    // Mark combat inactive on leave (just in case)
+    _worldController.dispose();
+    _combatTimer?.cancel();
+    _encounterBannerTimer?.cancel();
+    _logScrollController.dispose();
+    _combatRepaint.dispose();
     _gsRef?.setCombatActive(false);
     _stopCombat(notify: false);
-    _combatRepaint.dispose();
     super.dispose();
   }
 
@@ -1183,316 +1294,330 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
             ),
           ],
         ),
-        body: ShakeWidget(
-          key: _shakeKey,
-          child: Stack(
-            children: [
-              // Background path image (using existing asset for now)
-              Positioned.fill(
-                child: RepaintBoundary(
-                  child: Image.asset(
-                    'assets/images/backgrounds/battle_bg.png',
-                    fit: BoxFit.cover,
-                    errorBuilder:
-                        (context, error, stack) =>
-                            Container(color: Colors.black),
-                  ),
-                ),
-              ),
-              if (_encounterBanner != null)
-                Positioned(
-                  top: 8,
-                  left: 12,
-                  right: 12,
-                  child: Material(
-                    color: Colors.black.withValues(alpha: 0.85),
-                    borderRadius: BorderRadius.circular(12),
-                    elevation: 6,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.warning_amber_rounded,
-                            color: Colors.orangeAccent,
-                            size: 28,
+        body: AnimatedBuilder(
+          animation: _worldController,
+          builder: (context, _) {
+            final currentOffset = _lastWorldOffset + (_worldController.value * 200.0);
+            return ShakeWidget(
+              key: _shakeKey,
+              child: Stack(
+                children: [
+                  // Immersive Parallax Environment
+                  Positioned.fill(child: _ParallaxEnvironment(offset: currentOffset)),
+                  if (_encounterBanner != null)
+                    Positioned(
+                      top: 8,
+                      left: 12,
+                      right: 12,
+                      child: Material(
+                        color: Colors.black.withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(12),
+                        elevation: 6,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Attacked by $_encounterBanner!',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.2,
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.warning_amber_rounded,
+                                color: Colors.orangeAccent,
+                                size: 28,
                               ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Attacked by $_encounterBanner!',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  // HUDs (top and enemy) stacked vertically in SafeArea
+                  SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Panel(
+                            child: Row(
+                              children: [
+                                // Step Info
+                                Expanded(
+                                  flex: 2,
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.terrain, color: Colors.white70, size: 18),
+                                      const SizedBox(width: 8),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Step $_step',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                          Text(
+                                            'Best: ${gs.profile.highScore}',
+                                            style: const TextStyle(
+                                              color: Colors.white38,
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                          if (gs.isBlessActive) ...[
+                                            const SizedBox(height: 4),
+                                            GestureDetector(
+                                              onTap: () => _showBlessingInfo(context, gs),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.amber.withValues(alpha: 0.15),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                  border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(Icons.auto_awesome, color: Colors.amber, size: 10),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      'BLESSED (${gs.blessRemainingSeconds}s)',
+                                                      style: const TextStyle(color: Colors.amber, fontSize: 8, fontWeight: FontWeight.bold),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Coins
+                                Expanded(
+                                  flex: 1,
+                                  child: Center(
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.monetization_on, color: Colors.amber, size: 20),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '${p.coins}',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                // Player Stats (HP/Stamina)
+                                Expanded(
+                                  flex: 3,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      StatBar(
+                                        label: 'HP',
+                                        value: p.health,
+                                        max: p.maxHealth,
+                                        color: Colors.red,
+                                        icon: Icons.favorite,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      StatBar(
+                                        label: 'Stamina',
+                                        value: p.stamina,
+                                        max: p.maxStamina,
+                                        color: Colors.green,
+                                        icon: Icons.bolt,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
+                          ValueListenableBuilder<int>(
+                            valueListenable: _combatRepaint,
+                            builder: (context, _, __) {
+                              final m = _monster;
+                              return AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 600),
+                                switchInCurve: Curves.easeOutBack,
+                                switchOutCurve: Curves.easeInCirc,
+                                transitionBuilder: (Widget child, Animation<double> animation) {
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: ScaleTransition(
+                                      scale: animation,
+                                      alignment: Alignment.center,
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                child: m == null
+                                    ? const SizedBox.shrink(key: ValueKey('no_monster'))
+                                    : Column(
+                                        key: ValueKey('monster_${m.name}_${m.hp}'), // Use HP to distinguish same-name monsters if needed
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                                        children: [
+                                          const SizedBox(height: 12),
+                                          Panel(
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  m.name,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 20,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 8),
+                                                _MonsterPortrait(
+                                                  imageAsset: m.imageAsset,
+                                                  hitVersion: _monsterHitVersion,
+                                                  isDying: _monsterDying,
+                                                  windUpScale: _progressTo(
+                                                            _nextMonsterHit,
+                                                            _monsterIntervalMs,
+                                                          ) >
+                                                          0.88
+                                                      ? 1.0 +
+                                                          0.04 *
+                                                              sin(
+                                                                DateTime.now()
+                                                                        .millisecondsSinceEpoch /
+                                                                    185.0,
+                                                              )
+                                                      : 1.0,
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Padding(
+                                                  padding: const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                  ),
+                                                  child: _MonsterHpBar(
+                                                    current: m.hp,
+                                                    max: m.maxHp,
+                                                    damageFlashKey: _monsterHitVersion,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Padding(
+                                                  padding: const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                  ),
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment.start,
+                                                    children: [
+                                                      Row(
+                                                        children: [
+                                                          const Icon(
+                                                            Icons.schedule,
+                                                            color: Colors.white70,
+                                                            size: 18,
+                                                          ),
+                                                          const SizedBox(width: 8),
+                                                          const Text(
+                                                            'Attack timing',
+                                                            style: TextStyle(
+                                                              color: Colors.white,
+                                                              fontWeight: FontWeight.w700,
+                                                              fontSize: 14,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      const SizedBox(height: 10),
+                                                      _AttackTimeline(
+                                                        icon: Icons.sports_martial_arts,
+                                                        title: 'Your next swing',
+                                                        progress: _progressTo(
+                                                          _nextPlayerHit,
+                                                          _playerIntervalMs,
+                                                        ),
+                                                        secondsLeft: _secondsUntilNextHit(
+                                                          _nextPlayerHit,
+                                                        ),
+                                                        accent: Colors.lightGreenAccent,
+                                                      ),
+                                                      const SizedBox(height: 8),
+                                                      _AttackTimeline(
+                                                        icon: Icons.bolt,
+                                                        title: "${m.name}'s next swing",
+                                                        progress: _progressTo(
+                                                          _nextMonsterHit,
+                                                          _monsterIntervalMs,
+                                                        ),
+                                                        secondsLeft: _secondsUntilNextHit(
+                                                          _nextMonsterHit,
+                                                        ),
+                                                        accent: Colors.redAccent,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                              );
+                            },
+                          ),
+                          Expanded(
+                            child: _BattleLogList(
+                              logs: _logs,
+                              controller: _logScrollController,
+                            ),
+                          ),
+                          const SizedBox(height: 140),
                         ],
                       ),
                     ),
                   ),
-                ),
-              // HUDs (top and enemy) stacked vertically in SafeArea so enemy HUD starts under HP/Stamina HUD
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Panel(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Step: $_step',
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '| Best: ${gs.profile.highScore}',
-                                  style: const TextStyle(
-                                      color: Colors.white54, fontSize: 12),
-                                ),
-                                const SizedBox(width: 12),
-                                const Icon(
-                                  Icons.monetization_on,
-                                  color: Colors.amber,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${p.coins}',
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                              ],
-                            ),
-                            if (gs.isBlessActive)
-                              InkWell(
-                                borderRadius: BorderRadius.circular(6),
-                                onTap: () => _showBlessingInfo(context, gs),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.auto_awesome,
-                                      color: Colors.amberAccent,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Bless ${gs.blessRemainingSeconds}s',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            SizedBox(
-                              width: 180,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  StatBar(
-                                    label: 'HP',
-                                    value: p.health,
-                                    max: p.maxHealth,
-                                    color: Colors.red,
-                                    icon: Icons.favorite,
-                                  ),
-                                  const SizedBox(height: 6),
-                                  StatBar(
-                                    label: 'Stamina',
-                                    value: p.stamina,
-                                    max: p.maxStamina,
-                                    color: Colors.green,
-                                    icon: Icons.bolt,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      ValueListenableBuilder<int>(
+                  // Floating damage numbers overlay
+                  if (_monster != null || _floats.isNotEmpty)
+                    Positioned.fill(
+                      child: ValueListenableBuilder<int>(
                         valueListenable: _combatRepaint,
                         builder: (context, _, __) {
-                          final m = _monster;
-                          if (m == null) return const SizedBox.shrink();
-                          return Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              const SizedBox(height: 12),
-                              Panel(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      m.name,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    _MonsterPortrait(
-                                      imageAsset: m.imageAsset,
-                                      hitVersion: _monsterHitVersion,
-                                      windUpScale: _progressTo(
-                                                _nextMonsterHit,
-                                                _monsterIntervalMs,
-                                              ) >
-                                              0.88
-                                          ? 1.0 +
-                                              0.04 *
-                                                  sin(
-                                                    DateTime.now()
-                                                            .millisecondsSinceEpoch /
-                                                        185.0,
-                                                  )
-                                          : 1.0,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                      ),
-                                      child: _MonsterHpBar(
-                                        current: m.hp,
-                                        max: m.maxHp,
-                                        damageFlashKey: _monsterHitVersion,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 14),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              const Icon(
-                                                Icons.schedule,
-                                                color: Colors.white70,
-                                                size: 18,
-                                              ),
-                                              const SizedBox(width: 8),
-                                              const Text(
-                                                'Attack timing',
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: 14,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'The bar fills as time passes. When it completes, that fighter swings automatically.',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              height: 1.35,
-                                              color: Colors.white
-                                                  .withValues(alpha: 0.55),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 12),
-                                          _AttackTimeline(
-                                            icon: Icons.sports_martial_arts,
-                                            title: 'Your next swing',
-                                            progress: _progressTo(
-                                              _nextPlayerHit,
-                                              _playerIntervalMs,
-                                            ),
-                                            secondsLeft: _secondsUntilNextHit(
-                                              _nextPlayerHit,
-                                            ),
-                                            accent: Colors.lightGreenAccent,
-                                          ),
-                                          const SizedBox(height: 14),
-                                          _AttackTimeline(
-                                            icon: Icons.bolt,
-                                            title: "${m.name}'s next swing",
-                                            progress: _progressTo(
-                                              _nextMonsterHit,
-                                              _monsterIntervalMs,
-                                            ),
-                                            secondsLeft: _secondsUntilNextHit(
-                                              _nextMonsterHit,
-                                            ),
-                                            accent: Colors.redAccent,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      Expanded(
-                        child: _BattleLogList(
-                          logs: _logs,
-                          controller: _logScrollController,
-                        ),
-                      ),
-                      const SizedBox(height: 140),
-                    ],
-                  ),
-                ),
-              ),
-              // Floating damage numbers overlay (isolated repaints via [_combatRepaint])
-              if (_monster != null || _floats.isNotEmpty)
-                Positioned.fill(
-                  child: ValueListenableBuilder<int>(
-                    valueListenable: _combatRepaint,
-                    builder: (context, _, __) {
-                      if (_floats.isEmpty) {
-                        return const SizedBox.shrink();
-                      }
-                      return IgnorePointer(
-                        child: Stack(
-                          children:
-                              _floats.map((f) {
-                                final align = Alignment(
-                                  f.xFrac * 2 - 1,
-                                  f.yFrac * 2 - 1,
-                                );
+                          if (_floats.isEmpty) return const SizedBox.shrink();
+                          return IgnorePointer(
+                            child: Stack(
+                              children: _floats.map((f) {
+                                final align = Alignment(f.xFrac * 2 - 1, f.yFrac * 2 - 1);
                                 final now = DateTime.now();
-                                final rawP =
-                                    (now.difference(f.start).inMilliseconds /
-                                            f.duration.inMilliseconds)
-                                        .clamp(0.0, 1.0);
-                                final moveP =
-                                    Curves.easeOut.transform(rawP);
+                                final rawP = (now.difference(f.start).inMilliseconds / f.duration.inMilliseconds).clamp(0.0, 1.0);
+                                final moveP = Curves.easeOut.transform(rawP);
                                 final dy = -f.rise * moveP;
-                                final opacity =
-                                    (1 - Curves.easeIn.transform(rawP))
-                                        .clamp(0.0, 1.0);
-                                final punchT =
-                                    (rawP / 0.2).clamp(0.0, 1.0);
-                                final punchScale = f.punch
-                                    ? 1.32 -
-                                        0.32 *
-                                            Curves.easeOut.transform(punchT)
-                                    : 1.0;
+                                final opacity = (1 - Curves.easeIn.transform(rawP)).clamp(0.0, 1.0);
+                                final punchT = (rawP / 0.2).clamp(0.0, 1.0);
+                                final punchScale = f.punch ? 1.32 - 0.32 * Curves.easeOut.transform(punchT) : 1.0;
                                 return Align(
                                   alignment: align,
                                   child: Opacity(
@@ -1507,14 +1632,8 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
                                             color: f.color,
                                             fontSize: f.fontSize,
                                             fontWeight: FontWeight.w800,
-                                            letterSpacing:
-                                                f.punch ? 0.3 : 0,
                                             shadows: const [
-                                              Shadow(
-                                                blurRadius: 6,
-                                                color: Colors.black87,
-                                                offset: Offset(0, 2),
-                                              ),
+                                              Shadow(blurRadius: 6, color: Colors.black87, offset: Offset(0, 2)),
                                             ],
                                           ),
                                         ),
@@ -1523,99 +1642,69 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> {
                                   ),
                                 );
                               }).toList(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              // Bottom inventory + advance button
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: SafeArea(
-                  minimum: const EdgeInsets.only(
-                    bottom: 12,
-                    left: 12,
-                    right: 12,
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white24),
-                    ),
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _InventoryBar(),
-                        const SizedBox(height: 8),
-                        if (gs.profile.health <= 0)
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: null,
-                                  child: const Text('Advance'),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: _requestLeave,
-                                  child: const Text('Leave'),
-                                ),
-                              ),
-                            ],
-                          )
-                        else
-                          SizedBox(
-                            width: double.infinity,
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed:
-                                        _monster == null
-                                            ? () => _advance(gs)
-                                            : null,
-                                    child: Text(
-                                      _monster == null
-                                          ? 'Advance'
-                                          : 'Fighting...',
-                                    ),
-                                  ),
-                                ),
-                                if (_monster != null) ...[
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.orange,
-                                        foregroundColor: Colors.black,
-                                      ),
-                                      onPressed:
-                                          _canPowerStrike
-                                              ? () => _performPowerStrike(gs)
-                                              : null,
-                                      child:
-                                          _canPowerStrike
-                                              ? const Text('Power Strike')
-                                              : Text(
-                                                '${(_powerStrikeCooldownSec - DateTime.now().difference(_lastPowerStrike!).inSeconds)}s',
-                                              ),
-                                    ),
-                                  ),
-                                ],
-                              ],
                             ),
-                          ),
-                      ],
+                          );
+                        },
+                      ),
+                    ),
+                  // Bottom inventory + advance button
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: SafeArea(
+                      minimum: const EdgeInsets.only(bottom: 12, left: 12, right: 12),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _InventoryBar(),
+                            const SizedBox(height: 8),
+                            if (gs.profile.health <= 0)
+                              Row(
+                                children: [
+                                  const Expanded(child: ElevatedButton(onPressed: null, child: Text('Advance'))),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: OutlinedButton(onPressed: _requestLeave, child: const Text('Leave'))),
+                                ],
+                              )
+                            else
+                              SizedBox(
+                                width: double.infinity,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: _monster == null ? () => _advance(gs) : null,
+                                        child: Text(_monster == null ? 'Advance' : 'Fighting...'),
+                                      ),
+                                    ),
+                                    if (_monster != null) ...[
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.black),
+                                          onPressed: _canPowerStrike ? () => _performPowerStrike(gs) : null,
+                                          child: _canPowerStrike ? const Text('Power Strike') : Text('${(_powerStrikeCooldownSec - DateTime.now().difference(_lastPowerStrike!).inSeconds)}s'),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -1713,50 +1802,70 @@ class _InventoryBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.watch<GameState>().profile;
 
-    Widget cell(String label, Item? item) => Expanded(
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap:
-              item == null
-                  ? null
-                  : () => _showItemDetails(context, label, item),
-          child: Container(
-            height: 90,
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: _rarityColor(item?.rarity)),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            alignment: Alignment.center,
-            child:
-                item == null
-                    ? const SizedBox.shrink()
-                    : Tooltip(
-                      message: item.stats.entries
-                          .map((e) => _statLine(e.key, e.value))
-                          .join('\n'),
-                      preferBelow: false,
-                      child: SizedBox(
-                        width: 60,
-                        height: 60,
-                        child: Image.asset(
-                          item.effectiveAssetPath,
-                          fit: BoxFit.contain,
-                          errorBuilder:
-                              (c, e, s) => Icon(
-                                Icons.inventory_2,
-                                color: _rarityColor(item.rarity),
-                              ),
+    Widget cell(String label, Item? item) {
+      final color = _rarityColor(item?.rarity);
+      final hasItem = item != null;
+
+      return Expanded(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: !hasItem ? null : () => _showItemDetails(context, label, item),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              height: 94,
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: color.withValues(alpha: hasItem ? 0.8 : 0.2),
+                  width: hasItem ? 1.5 : 1,
+                ),
+                boxShadow: hasItem
+                    ? [
+                        BoxShadow(
+                          color: color.withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          spreadRadius: 1,
                         ),
-                      ),
+                      ]
+                    : null,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    label.toUpperCase(),
+                    style: TextStyle(
+                      color: color.withValues(alpha: 0.6),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
                     ),
+                  ),
+                  const SizedBox(height: 6),
+                  Expanded(
+                    child: !hasItem
+                        ? Icon(Icons.add_circle_outline, color: Colors.white10, size: 20)
+                        : Tooltip(
+                            message: item.stats.entries.map((e) => _statLine(e.key, e.value)).join('\n'),
+                            preferBelow: false,
+                            child: Image.asset(
+                              item.effectiveAssetPath,
+                              fit: BoxFit.contain,
+                              errorBuilder: (c, e, s) => Icon(Icons.inventory_2, color: color, size: 24),
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-      ),
-    );
+      );
+    }
 
     return Row(
       children: [
@@ -1777,47 +1886,69 @@ class _MonsterPortrait extends StatelessWidget {
     required this.imageAsset,
     required this.hitVersion,
     required this.windUpScale,
+    this.isDying = false,
   });
 
   final String imageAsset;
   final int hitVersion;
   final double windUpScale;
+  final bool isDying;
 
   @override
   Widget build(BuildContext context) {
-    final img = Image.asset(
-      imageAsset,
-      fit: BoxFit.contain,
-      errorBuilder:
-          (c, e, s) => const Icon(
-            Icons.pest_control,
-            color: Colors.white54,
-            size: 64,
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(isDying),
+      tween: Tween(begin: 0.0, end: isDying ? 1.0 : 0.0),
+      duration: const Duration(milliseconds: 500),
+      builder: (context, sink, child) {
+        return Transform.translate(
+          offset: Offset(0, sink * 100),
+          child: Opacity(
+            opacity: (1.0 - sink).clamp(0.0, 1.0),
+            child: child,
           ),
-    );
-
-    Widget scaled(Widget child) =>
-        Transform.scale(scale: windUpScale, child: child);
-
-    if (hitVersion == 0) {
-      return SizedBox(
-        width: 104,
-        height: 104,
-        child: scaled(img),
-      );
-    }
-
-    return SizedBox(
-      width: 104,
-      height: 104,
+        );
+      },
       child: TweenAnimationBuilder<double>(
         key: ValueKey(hitVersion),
         tween: Tween(begin: 1.14, end: 1.0),
         duration: const Duration(milliseconds: 340),
         curve: Curves.elasticOut,
-        builder: (context, recoil, child) =>
-            Transform.scale(scale: recoil * windUpScale, child: child),
-        child: img,
+        builder: (context, recoil, child) {
+          final flash = hitVersion > 0 && recoil > 1.02 ? (recoil - 1.0) * 5 : 0.0;
+          return Transform.scale(
+            scale: (hitVersion == 0 ? 1.0 : recoil) * windUpScale,
+            child: Stack(
+              children: [
+                imageAsset.isNotEmpty
+                    ? SizedBox(
+                        height: 110,
+                        width: 110,
+                        child: Image.asset(
+                          imageAsset,
+                          fit: BoxFit.contain,
+                          errorBuilder: (c, e, s) => const Icon(Icons.pest_control, color: Colors.white54, size: 64),
+                        ),
+                      )
+                    : const Icon(Icons.pest_control, color: Colors.white54, size: 64),
+                if (flash > 0)
+                  Positioned.fill(
+                    child: Opacity(
+                      opacity: flash.clamp(0.0, 1.0),
+                      child: imageAsset.isNotEmpty
+                          ? Image.asset(
+                              imageAsset,
+                              fit: BoxFit.contain,
+                              color: Colors.white,
+                              colorBlendMode: BlendMode.srcIn,
+                            )
+                          : Container(color: Colors.white),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -2208,7 +2339,8 @@ class Monster {
 class _LogEntry {
   final String text;
   final Color color;
-  const _LogEntry(this.text, this.color);
+  final IconData? icon;
+  const _LogEntry(this.text, this.color, {this.icon});
 }
 
 class _BattleLogList extends StatelessWidget {
@@ -2229,24 +2361,37 @@ class _BattleLogList extends StatelessWidget {
       ),
       child: ListView.builder(
         controller: controller,
+        padding: EdgeInsets.zero,
         itemCount: logs.length,
         itemBuilder: (context, index) {
           final log = logs[index];
           return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Text(
-              log.text,
-              style: TextStyle(
-                color: log.color,
-                fontSize: 13,
-                shadows: const [
-                  Shadow(
-                    color: Colors.black,
-                    offset: Offset(1, 1),
-                    blurRadius: 2,
-                  ),
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (log.icon != null) ...[
+                  Icon(log.icon, size: 14, color: log.color),
+                  const SizedBox(width: 8),
                 ],
-              ),
+                Expanded(
+                  child: Text(
+                    log.text,
+                    style: TextStyle(
+                      color: log.color,
+                      fontSize: 13,
+                      fontWeight: log.color != Colors.white38 ? FontWeight.w600 : FontWeight.normal,
+                      shadows: const [
+                        Shadow(
+                          color: Colors.black,
+                          offset: Offset(1, 1),
+                          blurRadius: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           );
         },
@@ -2298,6 +2443,99 @@ class ShakeWidgetState extends State<ShakeWidget>
         return Transform.translate(offset: Offset(offset, 0), child: child);
       },
       child: widget.child,
+    );
+  }
+}
+
+class _ParallaxEnvironment extends StatelessWidget {
+  final double offset;
+
+  const _ParallaxEnvironment({required this.offset});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Stack(
+      children: [
+        // Sky/Background
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                scheme.surface,
+                scheme.surfaceContainerHigh,
+              ],
+            ),
+          ),
+        ),
+        // Distant Trees (slowest)
+        _ParallaxLayer(
+          offset: offset,
+          speed: 0.15,
+          child: Opacity(
+            opacity: 0.08,
+            child: Icon(Icons.park_rounded, size: 300, color: scheme.primary),
+          ),
+        ),
+        // Nearer Bushes
+        _ParallaxLayer(
+          offset: offset,
+          speed: 0.45,
+          child: Opacity(
+            opacity: 0.12,
+            child: Icon(Icons.grass_rounded, size: 150, color: scheme.secondary),
+          ),
+        ),
+        // Ground/Floor (fastest) - just a subtle texture/gradient
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 220,
+          child: _ParallaxLayer(
+            offset: offset,
+            speed: 1.0,
+            child: Container(
+              width: 1000,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    scheme.surface.withValues(alpha: 0),
+                    scheme.outlineVariant.withValues(alpha: 0.15),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ParallaxLayer extends StatelessWidget {
+  final double offset;
+  final double speed;
+  final Widget child;
+
+  const _ParallaxLayer({required this.offset, required this.speed, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    // Basic infinite wrapping wrap
+    const double width = 800; 
+    final x = -(offset * speed) % width;
+    
+    return Stack(
+      children: [
+        Transform.translate(offset: Offset(x, 100), child: child),
+        Transform.translate(offset: Offset(x + width, 100), child: child),
+        Transform.translate(offset: Offset(x - width, 100), child: child),
+      ],
     );
   }
 }
