@@ -354,6 +354,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
 
   // World Travel Animation
   late final AnimationController _worldController;
+  late final AnimationController _livingDriftController; // Phase 6: Continuous idle drift
   double _worldOffset = 0.0;
   double _lastWorldOffset = 0.0;
 
@@ -552,12 +553,10 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _gsRef ??= context.read<GameState>();
+    _livingDriftController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 120), // 2 min per loop
+    )..repeat();
   }
 
   void _advance(GameState gs) {
@@ -1254,6 +1253,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
   @override
   void dispose() {
     _worldController.dispose();
+    _livingDriftController.dispose();
     _combatTimer?.cancel();
     _encounterBannerTimer?.cancel();
     _logScrollController.dispose();
@@ -1295,15 +1295,17 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
           ],
         ),
         body: AnimatedBuilder(
-          animation: _worldController,
+          animation: Listenable.merge([_worldController, _livingDriftController]),
           builder: (context, _) {
-            final currentOffset = _lastWorldOffset + (_worldController.value * 200.0);
+            final advanceOffset = _lastWorldOffset + (_worldController.value * 200.0);
+            final driftOffset = _livingDriftController.value * 1200.0; // Wide range for seamless wrapping
+            final totalOffset = advanceOffset + driftOffset;
             return ShakeWidget(
               key: _shakeKey,
               child: Stack(
                 children: [
-                  // Immersive Parallax Environment
-                  Positioned.fill(child: _ParallaxEnvironment(offset: currentOffset)),
+                  // Immersive Living Parallax Environment
+                  Positioned.fill(child: _ParallaxEnvironment(offset: totalOffset)),
                   if (_encounterBanner != null)
                     Positioned(
                       top: 8,
@@ -2454,60 +2456,99 @@ class _ParallaxEnvironment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Stack(
       children: [
-        // Sky/Background
+        // Sky Gradient: Sunset/Golden Hour
         Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                scheme.surface,
-                scheme.surfaceContainerHigh,
+                const Color(0xFF1A0B2E), // Deep Violet
+                const Color(0xFFE67E22), // Warm Orange
+                const Color(0xFFFFD97D), // Soft Yellow/Horizon
               ],
+              stops: const [0.0, 0.6, 1.0],
             ),
           ),
         ),
-        // Distant Trees (slowest)
+        // Glow Sun
+        _ParallaxLayer(
+          offset: offset,
+          speed: 0.02,
+          child: Center(
+            child: CustomPaint(
+              size: const Size(600, 600),
+              painter: _SunPainter(),
+            ),
+          ),
+        ),
+        // Distant Clouds
+        _ParallaxLayer(
+          offset: offset,
+          speed: 0.05,
+          child: SizedBox(
+            width: 400,
+            height: 200,
+            child: CustomPaint(
+              painter: _CloudPainter(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+          ),
+        ),
+        // Distant Rolling Hills
         _ParallaxLayer(
           offset: offset,
           speed: 0.15,
-          child: Opacity(
-            opacity: 0.08,
-            child: Icon(Icons.park_rounded, size: 300, color: scheme.primary),
+          child: SizedBox(
+            height: 400,
+            width: 800,
+            child: CustomPaint(
+              painter: _HillPainter(
+                color: const Color(0xFF4D3B2A).withValues(alpha: 0.4),
+                baseline: 0.7,
+              ),
+            ),
           ),
         ),
-        // Nearer Bushes
+        // Midground Mounds
         _ParallaxLayer(
           offset: offset,
-          speed: 0.45,
-          child: Opacity(
-            opacity: 0.12,
-            child: Icon(Icons.grass_rounded, size: 150, color: scheme.secondary),
+          speed: 0.35,
+          child: SizedBox(
+            height: 300,
+            width: 1000,
+            child: CustomPaint(
+              painter: _HillPainter(
+                color: const Color(0xFF2D1F15).withValues(alpha: 0.6),
+                baseline: 0.8,
+              ),
+            ),
           ),
         ),
-        // Ground/Floor (fastest) - just a subtle texture/gradient
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: 220,
-          child: _ParallaxLayer(
-            offset: offset,
-            speed: 1.0,
-            child: Container(
-              width: 1000,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    scheme.surface.withValues(alpha: 0),
-                    scheme.outlineVariant.withValues(alpha: 0.15),
-                  ],
-                ),
+        // Atmospheric Motes (Pollen/Dust)
+        _ParallaxLayer(
+          offset: offset,
+          speed: 0.8,
+          child: SizedBox(
+            width: 1200,
+            height: 800,
+            child: CustomPaint(
+              painter: _MotePainter(seed: 42),
+            ),
+          ),
+        ),
+        // Vignette/Atmosphere overlay
+        IgnorePointer(
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment.center,
+                radius: 1.4,
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withValues(alpha: 0.3),
+                ],
               ),
             ),
           ),
@@ -2526,16 +2567,107 @@ class _ParallaxLayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Basic infinite wrapping wrap
-    const double width = 800; 
+    // Basic infinite wrapping
+    const double width = 1200; 
     final x = -(offset * speed) % width;
     
     return Stack(
       children: [
-        Transform.translate(offset: Offset(x, 100), child: child),
-        Transform.translate(offset: Offset(x + width, 100), child: child),
-        Transform.translate(offset: Offset(x - width, 100), child: child),
+        Transform.translate(offset: Offset(x, 80), child: child),
+        Transform.translate(offset: Offset(x + width, 80), child: child),
+        Transform.translate(offset: Offset(x - width, 80), child: child),
       ],
     );
   }
+}
+
+class _CloudPainter extends CustomPainter {
+  final Color color;
+  _CloudPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    canvas.drawCircle(Offset(size.width * 0.3, size.height * 0.5), size.height * 0.4, paint);
+    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.4), size.height * 0.5, paint);
+    canvas.drawCircle(Offset(size.width * 0.7, size.height * 0.5), size.height * 0.4, paint);
+    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.6), size.height * 0.35, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _SunPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final paint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFFFFD97D),
+          const Color(0xFFFFD97D).withValues(alpha: 0.0),
+        ],
+        stops: const [0.2, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: size.width / 2));
+    
+    canvas.drawCircle(center, size.width / 2, paint);
+    
+    // Core Sun
+    canvas.drawCircle(
+      center, 
+      size.width * 0.08, 
+      Paint()..color = const Color(0xFFFEF9E7)
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _HillPainter extends CustomPainter {
+  final Color color;
+  final double baseline;
+  _HillPainter({required this.color, required this.baseline});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    final path = Path();
+    final h = size.height;
+    final w = size.width;
+
+    path.moveTo(0, h);
+    path.lineTo(0, h * baseline);
+    path.quadraticBezierTo(w * 0.25, h * (baseline - 0.15), w * 0.5, h * baseline);
+    path.quadraticBezierTo(w * 0.75, h * (baseline + 0.1), w, h * (baseline - 0.05));
+    path.lineTo(w, h);
+    path.close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _MotePainter extends CustomPainter {
+  final int seed;
+  _MotePainter({required this.seed});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rnd = Random(seed);
+    final paint = Paint()..color = Colors.white.withValues(alpha: 0.15);
+    
+    for (int i = 0; i < 40; i++) {
+      final x = rnd.nextDouble() * size.width;
+      final y = rnd.nextDouble() * size.height;
+      final radius = rnd.nextDouble() * 2.0;
+      canvas.drawCircle(Offset(x, y), radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
