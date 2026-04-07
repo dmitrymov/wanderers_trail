@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../data/models/item.dart';
 import '../data/models/pet.dart';
 import '../data/models/player_profile.dart';
+import '../data/models/hero_class.dart';
 import '../data/repositories/game_repository.dart';
 import '../core/stats.dart';
 import 'package:flutter/foundation.dart';
@@ -74,6 +75,161 @@ class GameState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // --- Class Skill State ---
+  final Map<String, DateTime> _lastSkillUsage = {};
+
+  // Active timed buffs from skills
+  bool _isIronWallActive = false;
+  bool _isShadowStrikeActive = false;
+  int _shadowStrikeHitsRemaining = 0;
+  bool _isBloodlustActive = false;
+
+  bool get isIronWallActive => _isIronWallActive;
+  bool get isShadowStrikeActive => _isShadowStrikeActive;
+  bool get isBloodlustActive => _isBloodlustActive;
+
+  bool canUseSkill(String classId) {
+    final cls = HeroClass.get(classId);
+    final skill = cls.skill;
+    if (skill == null) return false;
+    if (skill.cooldownSec <= 0) return true; // Passive or no CD
+
+    final last = _lastSkillUsage[classId];
+    if (last == null) return true;
+    
+    final elapsed = DateTime.now().difference(last).inSeconds;
+    return elapsed >= skill.cooldownSec;
+  }
+
+  double getSkillCooldownProgress(String classId) {
+    final cls = HeroClass.get(classId);
+    final skill = cls.skill;
+    if (skill == null || skill.cooldownSec <= 0) return 1.0;
+
+    final last = _lastSkillUsage[classId];
+    if (last == null) return 1.0;
+
+    final elapsed = DateTime.now().difference(last).inSeconds;
+    return (elapsed / skill.cooldownSec).clamp(0.0, 1.0);
+  }
+
+  bool isSkillOffCooldown(String skillId) {
+    final last = _lastSkillUsage[profile.selectedClassId];
+    if (last == null) return true;
+    final cls = HeroClass.get(profile.selectedClassId);
+    final skill = cls.skill;
+    if (skill == null || skill.id != skillId) return true;
+    final elapsed = DateTime.now().difference(last).inSeconds;
+    return elapsed >= skill.cooldownSec;
+  }
+
+  void startSkillCooldown(String skillId) {
+    _lastSkillUsage[profile.selectedClassId] = DateTime.now();
+    notifyListeners();
+  }
+
+  void activateSkillBuff(String skillId) {
+    switch (skillId) {
+      case 'iron_wall':
+        _isIronWallActive = true;
+        Timer(const Duration(seconds: 5), () {
+          _isIronWallActive = false;
+          notifyListeners();
+        });
+        break;
+      case 'shadow_strike':
+        _isShadowStrikeActive = true;
+        _shadowStrikeHitsRemaining = 3;
+        break;
+      case 'bloodlust':
+        _isBloodlustActive = true;
+        _invalidateStatsCache();
+        Timer(const Duration(seconds: 8), () {
+          _isBloodlustActive = false;
+          _invalidateStatsCache();
+          notifyListeners();
+        });
+        break;
+    }
+    notifyListeners();
+  }
+
+  int getSkillSecondsRemaining(String skillId) {
+    final last = _lastSkillUsage[profile.selectedClassId];
+    if (last == null) return 0;
+    final cls = HeroClass.get(profile.selectedClassId);
+    final skill = cls.skill;
+    if (skill == null || skill.id != skillId) return 0;
+    final elapsed = DateTime.now().difference(last).inSeconds;
+    return max(0, skill.cooldownSec - elapsed);
+  }
+
+  /// Triggers the skill for the currently selected class.
+  /// Returns a map with effect details (e.g. {type: 'instant_damage', value: 1.5})
+  Map<String, dynamic>? useActiveSkill() {
+    final classId = profile.selectedClassId;
+    if (!canUseSkill(classId)) return null;
+
+    final cls = HeroClass.get(classId);
+    final skill = cls.skill;
+    if (skill == null) return null;
+
+    _lastSkillUsage[classId] = DateTime.now();
+
+    Map<String, dynamic>? result;
+
+    switch (skill.id) {
+      case 'power_strike':
+        result = {'type': 'damage_multiplier', 'value': 1.5, 'name': 'Power Strike'};
+        break;
+      
+      case 'iron_wall':
+        _isIronWallActive = true;
+        result = {'type': 'buff', 'name': 'Iron Wall', 'duration': 5};
+        Timer(const Duration(seconds: 5), () {
+          _isIronWallActive = false;
+          notifyListeners();
+        });
+        break;
+
+      case 'shadow_strike':
+        _isShadowStrikeActive = true;
+        _shadowStrikeHitsRemaining = 3;
+        result = {'type': 'buff', 'name': 'Shadow Strike', 'hits': 3};
+        break;
+
+      case 'arcane_burst':
+        result = {'type': 'instant_damage', 'value': 4.0, 'name': 'Arcane Burst'};
+        break;
+
+      case 'bloodlust':
+        _isBloodlustActive = true;
+        _invalidateStatsCache(); // Speed changes
+        result = {'type': 'buff', 'name': 'Bloodlust', 'duration': 8};
+        Timer(const Duration(seconds: 8), () {
+          _isBloodlustActive = false;
+          _invalidateStatsCache();
+          notifyListeners();
+        });
+        break;
+    }
+
+    notifyListeners();
+    return result;
+  }
+
+  void consumeShadowStrikeHit() {
+    if (_shadowStrikeHitsRemaining > 0) {
+      _shadowStrikeHitsRemaining--;
+      if (_shadowStrikeHitsRemaining == 0) {
+        _isShadowStrikeActive = false;
+      }
+      notifyListeners();
+    }
+  }
+
+  // --- End Class Skill State ---
+
   static const PlayerProfile _placeholder = PlayerProfile(
     userId: 'local',
     health: 100,
@@ -92,6 +248,8 @@ class GameState extends ChangeNotifier {
     permDefenseLevel: 0,
     permSpeedLevel: 0,
     speedMultiplier: 0.1,
+    selectedClassId: 'survivor',
+    unlockedClassIds: ['survivor'],
   );
 
   // Upgrade config
@@ -111,7 +269,7 @@ class GameState extends ChangeNotifier {
   int get speedUpgradeCost => 50 + 25 * profile.speedUpgrades;
 
   double get maxSpeedMultiplier =>
-      (1.0 + profile.speedUpgrades * speedUpgradeStep + profile.permSpeedLevel * permSpeedStep).clamp(1.0, 3.0);
+      (1.0 + profile.speedUpgrades * speedUpgradeStep + profile.permSpeedLevel * permSpeedStep + selectedClass.speedBonus).clamp(1.0, 3.0);
 
   // Diamonds and permanent upgrades
   int get diamonds => profile.diamonds;
@@ -170,6 +328,36 @@ class GameState extends ChangeNotifier {
     _persist();
   }
 
+  HeroClass get selectedClass => HeroClass.get(profile.selectedClassId);
+
+  void selectClass(String classId) {
+    if (!profile.unlockedClassIds.contains(classId)) return;
+    _profile = profile.copyWith(selectedClassId: classId);
+    _invalidateStatsCache();
+    notifyListeners();
+    _persist();
+  }
+
+  bool unlockClass(String classId, int cost, bool useDiamonds) {
+    if (profile.unlockedClassIds.contains(classId)) return true;
+    if (useDiamonds) {
+      if (profile.diamonds < cost) return false;
+      _profile = profile.copyWith(
+        diamonds: profile.diamonds - cost,
+        unlockedClassIds: [...profile.unlockedClassIds, classId],
+      );
+    } else {
+      if (profile.coins < cost) return false;
+      _profile = profile.copyWith(
+        coins: profile.coins - cost,
+        unlockedClassIds: [...profile.unlockedClassIds, classId],
+      );
+    }
+    notifyListeners();
+    _persist();
+    return true;
+  }
+
   void setSpeedMultiplier(double value) {
     _profile = profile.copyWith(speedMultiplier: value);
     _invalidateStatsCache();
@@ -178,8 +366,9 @@ class GameState extends ChangeNotifier {
   }
 
   void resetForNewRun() {
-    final baseMaxH = 100 + permHealthLevel * permHealthStep;
-    final baseMaxS = 100 + permStaminaLevel * permStaminaStep;
+    final cls = selectedClass;
+    final baseMaxH = 100 + permHealthLevel * permHealthStep + cls.healthBonus;
+    final baseMaxS = 100 + permStaminaLevel * permStaminaStep + cls.staminaBonus;
     _profile = profile.copyWith(
       health: baseMaxH,
       stamina: baseMaxS,
@@ -202,8 +391,9 @@ class GameState extends ChangeNotifier {
   }
 
   void prepareForCheckpointRun() {
-    final baseMaxH = 100 + permHealthLevel * permHealthStep;
-    final baseMaxS = 100 + permStaminaLevel * permStaminaStep;
+    final cls = selectedClass;
+    final baseMaxH = 100 + permHealthLevel * permHealthStep + cls.healthBonus;
+    final baseMaxS = 100 + permStaminaLevel * permStaminaStep + cls.staminaBonus;
     _profile = profile.copyWith(
       health: baseMaxH,
       stamina: baseMaxS,
@@ -321,9 +511,19 @@ class GameState extends ChangeNotifier {
   }
 
   void loseHealth(int amount) {
-    final int clamped =
-        (profile.health - amount).clamp(0, profile.maxHealth).toInt();
-    _profile = profile.copyWith(health: clamped);
+    if (_isIronWallActive) {
+      amount = (amount * 0.25).round();
+      if (amount < 1 && amount > 0) amount = 1; // Minimum 1 if was non-zero
+    }
+    final h = max(0, profile.health - (amount.toInt()));
+    _profile = profile.copyWith(health: h);
+    notifyListeners();
+    _persist();
+  }
+
+  void gainHealth(int amount) {
+    final h = min(totalMaxHealth, profile.health + amount);
+    _profile = profile.copyWith(health: h);
     notifyListeners();
     _persist();
   }
@@ -552,6 +752,10 @@ class GameState extends ChangeNotifier {
   double cfgNum(List<String> path, double fallback) => _cfgNum(path, fallback);
   int cfgInt(List<String> path, int fallback) => _cfgInt(path, fallback);
 
+  // ---- Stats Getters ----
+  int get totalMaxHealth => profile.maxHealth + selectedClass.healthBonus;
+  int get totalMaxStamina => profile.maxStamina + selectedClass.staminaBonus;
+
   String pickEnemyImage(String type, {required int difficultyIndex}) {
     final key = type.toLowerCase();
     final list = _enemyAssetsByType[key];
@@ -604,11 +808,20 @@ class GameState extends ChangeNotifier {
         attackBonus: permAttackLevel * permAttackStep,
         defenseBonus: permDefenseLevel * permDefenseStep,
       );
+      final cls = selectedClass;
+      final withClass = StatsSummary.withPetBonuses(
+        withPerm,
+        attackBonus: cls.attackBonus,
+        defenseBonus: cls.defenseBonus,
+        critChanceBonus: cls.critChanceBonus,
+        critDamageBonus: cls.critDamageBonus,
+      );
+
       final pet = selectedPet;
-      _statsCache = pet == null
-          ? withPerm
+      final withPet = pet == null
+          ? withClass
           : StatsSummary.withPetBonuses(
-              withPerm,
+              withClass,
               attackBonus: pet.attackBonus,
               defenseBonus: pet.defenseBonus,
               accuracyBonus: pet.accuracyBonus,
@@ -616,6 +829,26 @@ class GameState extends ChangeNotifier {
               critChanceBonus: pet.critChanceBonus,
               critDamageBonus: pet.critDamageBonus,
             );
+
+      // Apply class speed bonus to attackMs
+      double speedMultiplier = 1.0 + cls.speedBonus;
+      if (_isBloodlustActive) speedMultiplier += 0.5; // +50% speed from Bloodlust
+
+      if (speedMultiplier != 1.0) {
+        final newMs = (withPet.attackMs / speedMultiplier).round().clamp(200, 2000);
+        _statsCache = StatsSummary(
+          attack: withPet.attack,
+          defense: withPet.defense,
+          accuracy: withPet.accuracy,
+          evasion: withPet.evasion,
+          critChance: _isShadowStrikeActive ? 1.0 : withPet.critChance,
+          critDamage: withPet.critDamage,
+          attackMs: newMs,
+          dps: withPet.dps * speedMultiplier,
+        );
+      } else {
+        _statsCache = withPet;
+      }
       _cacheWeaponId = w;
       _cacheArmorId = a;
       _cacheRingId = r;

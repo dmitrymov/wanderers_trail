@@ -385,6 +385,12 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
   bool _skeletonReassembled = false;
   bool _monsterDying = false; // Phase 3: Death animation delay
 
+  // Status effects
+  int _monsterBurnTicks = 0;
+  int _monsterShatterTicks = 0;
+  bool _isInvulnerable = false;
+  Timer? _invulTimer;
+
   // Combat Log
   final List<_LogEntry> _logs = [];
   final ScrollController _logScrollController = ScrollController();
@@ -403,62 +409,82 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
   bool _playerResolvedExchange = false;
   bool _monsterResolvedExchange = false;
 
-  // Power Strike
   final _shakeKey = GlobalKey<ShakeWidgetState>();
-  DateTime? _lastPowerStrike;
-  static const int _powerStrikeCooldownSec = 10;
 
-  bool get _canPowerStrike {
+  bool _canUseSkill(GameState gs) {
     if (_monster == null) return false;
-    if (_lastPowerStrike == null) return true;
-    return DateTime.now().difference(_lastPowerStrike!).inSeconds >=
-        _powerStrikeCooldownSec;
+    final skillId = gs.profile.heroClass.skill?.id;
+    if (skillId == null) return false;
+    return gs.isSkillOffCooldown(skillId);
   }
 
-  void _performPowerStrike(GameState gs) {
-    if (!_canPowerStrike) return;
+  void _useActiveSkill(GameState gs) {
+    final skill = gs.profile.heroClass.skill;
+    if (skill == null || !_canUseSkill(gs) || _monster == null) return;
+    
+    gs.startSkillCooldown(skill.id);
 
-    setState(() {
-      _lastPowerStrike = DateTime.now();
-    });
+    final now = DateTime.now();
+    bool isEnemyTarget = false;
+    double dmgMult = 1.0;
+    
+    if (['power_strike', 'fireball', 'arcane_burst', 'execution'].contains(skill.id)) {
+      isEnemyTarget = true;
+      if (skill.id == 'power_strike') dmgMult = 1.5;
+      if (skill.id == 'fireball') dmgMult = 2.0;
+      if (skill.id == 'arcane_burst') dmgMult = 5.0;
+      if (skill.id == 'execution') dmgMult = 8.0;
+    }
 
-    final damage = (_calcPlayerDamage(gs) * 1.5).round();
-    final monDefense = _monster!.defense;
-    final finalDamage = _reduceByDefense(damage, monDefense);
+    if (isEnemyTarget) {
+      int dmg = (gs.statsSummary.attack * dmgMult).round();
+      
+      if (skill.id == 'execution' && ((_monster!.hp / _monster!.maxHp) < 0.25)) {
+        dmg = _monster!.hp; // Instant kill
+        _floats.add(_DamageFloat(text: 'EXECUTED!', color: Colors.red, start: now, duration: const Duration(milliseconds: 2000), xFrac: 0.5, yFrac: 0.1, rise: 80, punch: true, fontSize: 32));
+      } else {
+        _floats.add(_DamageFloat(text: '$dmg (${skill.name}!)', color: Colors.deepOrangeAccent, start: now, duration: const Duration(milliseconds: 1500), xFrac: 0.5, yFrac: 0.2, rise: 50, punch: true, fontSize: 26));
+      }
+      
+      _log('Used ${skill.name}! Deals $dmg damage.', gs.profile.heroClass.rarityColor, icon: Icons.local_fire_department);
+      
+      final finalDamage = _reduceByDefense(dmg, _monster!.defense);
+      setState(() {
+        _monsterHitVersion++;
+        _monster = _monster!.hit(finalDamage);
+      });
+      _notePlayerDamageToMonster(finalDamage);
+      
+      if (skill.id == 'fireball') {
+        _monsterBurnTicks += 5;
+      } else if (skill.id == 'arcane_burst') {
+        _monsterShatterTicks += 5;
+      }
+    } else {
+      // Self-targeted or buffs
+      if (skill.id == 'holy_aegis') {
+        _log('Used Holy Aegis! Invulnerable for 5s.', gs.profile.heroClass.rarityColor, icon: Icons.security);
+        setState(() => _isInvulnerable = true);
+        _invulTimer?.cancel();
+        _invulTimer = Timer(const Duration(seconds: 5), () {
+          if (mounted) setState(() => _isInvulnerable = false);
+        });
+        
+        final heal = (gs.profile.maxHealth * 0.3).round();
+        gs.loseHealth(-heal);
+        _floats.add(_DamageFloat(text: '+$heal', color: Colors.greenAccent, start: now, duration: const Duration(milliseconds: 1200), xFrac: 0.15, yFrac: 0.1, rise: 30));
+      } else if (['iron_wall', 'shadow_strike', 'bloodlust'].contains(skill.id)) {
+        _log('Activated ${skill.name}!', gs.profile.heroClass.rarityColor, icon: Icons.auto_awesome);
+        gs.activateSkillBuff(skill.id);
+        _floats.add(_DamageFloat(text: '${skill.name}!', color: Colors.purpleAccent, start: now, duration: const Duration(milliseconds: 1200), xFrac: 0.15, yFrac: 0.1, rise: 30));
+      }
+    }
 
-    _log(
-      'Power Strike! hit ${_monster!.name} for $finalDamage!',
-      Colors.orangeAccent,
-    );
+    // Reset player attack timer to give instant gratification
+    _nextPlayerHit = DateTime.now().add(Duration(milliseconds: _playerIntervalMs));
 
-    _floats.add(
-      _DamageFloat(
-        text: '$finalDamage (Power!)',
-        color: Colors.orange,
-        start: DateTime.now(),
-        duration: const Duration(milliseconds: 1500),
-        xFrac: 0.5,
-        yFrac: 0.3,
-        rise: 56,
-        punch: true,
-        fontSize: 26,
-      ),
-    );
-
-    setState(() {
-      _monsterHitVersion++;
-      _monster = _monster!.hit(finalDamage);
-    });
-
-    _notePlayerDamageToMonster(finalDamage);
-
-    // Reset player attack timer to give instant gratification (attack now, then wait usual interval)
-    _nextPlayerHit = DateTime.now().add(
-      Duration(milliseconds: _playerIntervalMs),
-    );
-
-    if (_monster!.hp <= 0) {
-      _onMonsterDefeated(gs);
+    if (_monster != null && _monster!.hp <= 0) {
+      if (mounted) _onMonsterDefeated(gs);
     }
   }
 
@@ -632,6 +658,8 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
     _stopCombat(notify: false);
     if (_monster == null) return;
     _monsterHitVersion = 0;
+    _monsterBurnTicks = 0;
+    _monsterShatterTicks = 0;
     _skeletonReassembled = false;
     _monsterDying = false;
     context.read<GameState>().setCombatActive(true);
@@ -660,6 +688,27 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
         });
         return;
       }
+
+      // Status Tick: Burn
+      if (_monsterBurnTicks > 0 && (_combatTimer?.tick ?? 0) % 10 == 0) {
+        _monsterBurnTicks--;
+        final burnDmg = max(1, (_monster!.maxHp * 0.05).round());
+        _floats.add(_DamageFloat(text: '-$burnDmg (Burn)', color: Colors.orange, start: now, duration: const Duration(milliseconds: 800), xFrac: 0.7, yFrac: 0.1, rise: 20));
+        setState(() => _monster = _monster!.hit(burnDmg));
+        if (_monster!.hp <= 0 && !_monsterDying) {
+          setState(() => _monsterDying = true);
+          Future.delayed(const Duration(milliseconds: 600), () {
+            if (mounted) _onMonsterDefeated(gs);
+          });
+          return;
+        }
+      }
+
+      // Status Tick: Shatter expiry
+      if (_monsterShatterTicks > 0 && (_combatTimer?.tick ?? 0) % 10 == 0) {
+        _monsterShatterTicks--;
+      }
+
       if (_nextPlayerHit != null && now.isAfter(_nextPlayerHit!)) {
         // Accuracy check
         final hitChance = (0.8 + _sumStat(gs, ItemStatType.accuracy)).clamp(
@@ -677,6 +726,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
         _nextPlayerHit = now.add(Duration(milliseconds: _playerIntervalMs));
         if (hit && !evaded) {
           var damage = _calcPlayerDamage(gs);
+          if (_monsterShatterTicks > 0) damage = (damage * 1.5).round();
           // Crit roll
           final critChance = _sumStat(
             gs,
@@ -785,6 +835,13 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
         _nextMonsterHit = now.add(Duration(milliseconds: _monsterIntervalMs));
         var monsterSwingDamage = 0;
         if (hit) {
+          if (_isInvulnerable) {
+            final fx = 0.15 + (_rnd.nextDouble() - 0.5) * 0.12;
+            _floats.add(_DamageFloat(text: 'BLOCKED', color: Colors.amber, start: now, duration: const Duration(milliseconds: 1000), xFrac: fx, yFrac: 0.08, rise: 26, fontSize: 20));
+            _log('Blocked ${_monster!.name}\'s attack with Holy Aegis.', Colors.amber, icon: Icons.security);
+            _onMonsterAttackResolved(0);
+            return;
+          }
           int raw = 2 + (_step ~/ 5) + _rnd.nextInt(3);
           if (_monster!.type == MonsterType.slime) {
             // Higher tier slimes hit harder (less reduction)
@@ -1052,6 +1109,11 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
     _nextPoisonTick = null;
     _poisonTicksRemaining = 0;
     _poisonDamagePerTick = 0;
+    _monsterBurnTicks = 0;
+    _monsterShatterTicks = 0;
+    _isInvulnerable = false;
+    _invulTimer?.cancel();
+    _invulTimer = null;
     _resetExchangeRoundTracking();
     if (notify && needsFrame && mounted) setState(() {});
   }
@@ -1483,12 +1545,26 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      StatBar(
-                                        label: 'HP',
-                                        value: p.health,
-                                        max: p.maxHealth,
-                                        color: Colors.red,
-                                        icon: Icons.favorite,
+                                      Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          StatBar(
+                                            label: 'HP',
+                                            value: p.health,
+                                            max: p.maxHealth,
+                                            color: Colors.red,
+                                            icon: Icons.favorite,
+                                          ),
+                                          if (_isInvulnerable)
+                                            Positioned(
+                                              right: -8, top: -8,
+                                              child: Container(
+                                                padding: EdgeInsets.all(2),
+                                                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.amber),
+                                                child: Icon(Icons.security, size: 14, color: Colors.white),
+                                              ),
+                                            ),
+                                        ]
                                       ),
                                       const SizedBox(height: 6),
                                       StatBar(
@@ -1550,6 +1626,16 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
                                                         fontWeight: FontWeight.bold,
                                                       ),
                                                     ),
+                                                    if (_monsterBurnTicks > 0)
+                                                      const Padding(
+                                                        padding: EdgeInsets.only(left: 6),
+                                                        child: Icon(Icons.local_fire_department, size: 16, color: Colors.orange),
+                                                      ),
+                                                    if (_monsterShatterTicks > 0)
+                                                      const Padding(
+                                                        padding: EdgeInsets.only(left: 4),
+                                                        child: Icon(Icons.auto_fix_high, size: 16, color: Colors.purpleAccent),
+                                                      ),
                                                     const SizedBox(width: 8),
                                                     _TierStars(tier: m.tier),
                                                   ],
@@ -1758,11 +1844,14 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
                                     if (_monster != null) ...[
                                       const SizedBox(width: 12),
                                       Expanded(
-                                        child: _PowerStrikeButton(
-                                          canStrike: _canPowerStrike,
-                                          cooldownSec: _powerStrikeCooldownSec,
-                                          lastStrike: _lastPowerStrike,
-                                          onPressed: () => _performPowerStrike(gs),
+                                        child: _ClassSkillButton(
+                                          name: gs.profile.heroClass.skill?.name ?? 'Strike',
+                                          icon: 'assets/images/icons/skills/${gs.profile.heroClass.skill?.id ?? "power_strike"}.png',
+                                          color: gs.profile.heroClass.rarityColor,
+                                          canUse: _canUseSkill(gs),
+                                          cooldownProgress: gs.getSkillCooldownProgress(gs.profile.selectedClassId),
+                                          secondsLeft: gs.getSkillSecondsRemaining(gs.profile.heroClass.skill?.id ?? ""),
+                                          onPressed: () => _useActiveSkill(gs),
                                         ),
                                       ),
                                     ],
@@ -2802,118 +2891,78 @@ class _TierStars extends StatelessWidget {
   }
 }
 
-/// Animated Power Strike button with a cooldown ring progress indicator.
-class _PowerStrikeButton extends StatefulWidget {
-  final bool canStrike;
-  final int cooldownSec;
-  final DateTime? lastStrike;
+/// Class Skill button with dynamic styling and cooldown tracking
+class _ClassSkillButton extends StatelessWidget {
+  final String name;
+  final String icon;
+  final Color color;
+  final bool canUse;
+  final double cooldownProgress;
+  final int secondsLeft;
   final VoidCallback onPressed;
 
-  const _PowerStrikeButton({
-    required this.canStrike,
-    required this.cooldownSec,
-    required this.lastStrike,
+  const _ClassSkillButton({
+    required this.name,
+    required this.icon,
+    required this.color,
+    required this.canUse,
+    required this.cooldownProgress,
+    required this.secondsLeft,
     required this.onPressed,
   });
 
   @override
-  State<_PowerStrikeButton> createState() => _PowerStrikeButtonState();
-}
-
-class _PowerStrikeButtonState extends State<_PowerStrikeButton>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _pulseController;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (widget.canStrike) {
-      return AnimatedBuilder(
-        animation: _pulseController,
-        builder: (context, child) {
-          final glow = 0.4 + _pulseController.value * 0.6;
-          return Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.orange.withValues(alpha: glow * 0.5),
-                  blurRadius: 12 * glow,
-                  spreadRadius: 2 * glow,
-                ),
-              ],
-            ),
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE65100),
-                foregroundColor: Colors.white,
-                elevation: 4,
-              ),
-              onPressed: widget.onPressed,
-              icon: const Icon(Icons.flash_on_rounded, size: 18),
-              label: const Text(
-                'Power Strike',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ),
-          );
-        },
-      );
-    }
-
-    // Cooldown mode: show ring progress
-    final elapsed = widget.lastStrike == null
-        ? widget.cooldownSec.toDouble()
-        : DateTime.now().difference(widget.lastStrike!).inMilliseconds /
-            1000.0;
-    final progress = (elapsed / widget.cooldownSec).clamp(0.0, 1.0);
-    final remaining = (widget.cooldownSec - elapsed).ceil().clamp(0, widget.cooldownSec);
-
     return Stack(
       alignment: Alignment.center,
       children: [
-        ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey.withValues(alpha: 0.3),
-            foregroundColor: Colors.white54,
-            disabledBackgroundColor: Colors.grey.withValues(alpha: 0.2),
-            disabledForegroundColor: Colors.white38,
+        Container(
+          height: 48,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: canUse
+                ? [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.4),
+                      blurRadius: 10,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : null,
           ),
-          onPressed: null,
-          icon: const Icon(Icons.flash_on_rounded, size: 18),
-          label: Text(
-            '${remaining}s',
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-        ),
-        Positioned(
-          right: 6,
-          top: 6,
-          child: SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(
-              value: progress,
-              strokeWidth: 2,
-              backgroundColor: Colors.white12,
-              color: Colors.orangeAccent,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: canUse ? color : Colors.grey.withValues(alpha: 0.3),
+              foregroundColor: canUse ? Colors.white : Colors.white38,
+              disabledBackgroundColor: Colors.grey.withValues(alpha: 0.2),
+              disabledForegroundColor: Colors.white38,
+              elevation: canUse ? 4 : 0,
+            ),
+            onPressed: canUse ? onPressed : null,
+            icon: canUse
+                ? Image.asset(icon, width: 18, height: 18, color: Colors.white, errorBuilder: (c,e,s) => const Icon(Icons.flash_on, size: 18))
+                : const Icon(Icons.hourglass_empty, size: 18),
+            label: Text(
+              canUse ? name.toUpperCase() : '${secondsLeft}s',
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
             ),
           ),
         ),
+        if (!canUse)
+          Positioned(
+            right: 6,
+            top: 6,
+            child: SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                value: cooldownProgress,
+                strokeWidth: 2,
+                backgroundColor: Colors.white12,
+                color: color,
+              ),
+            ),
+          ),
       ],
     );
   }

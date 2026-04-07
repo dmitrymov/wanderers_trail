@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../theme/tokens.dart';
 import '../../state/game_state.dart';
+import '../../data/models/hero_class.dart';
 import '../widgets/panel.dart';
 
 class ShopTab extends StatelessWidget {
@@ -100,6 +101,28 @@ class ShopTab extends StatelessWidget {
           canAfford: gs.diamonds >= speedCost,
           onPressed: () => gs.purchasePermanent(PermanentUpgrade.speed),
         ),
+        const SizedBox(height: 32),
+        
+        _SectionHeader(title: 'HERO CLASSES', color: scheme.primary),
+        const SizedBox(height: 8),
+        const Text(
+          'Unlock specialized classes with unique passive bonuses.',
+          style: TextStyle(fontSize: 12, color: Colors.black45, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 16),
+        ...HeroClass.allClasses().where((c) => c.id != 'survivor').map((c) {
+          final isUnlocked = gs.profile.unlockedClassIds.contains(c.id);
+          return Column(
+            children: [
+              _ClassPurchaseCard(
+                heroClass: c,
+                isUnlocked: isUnlocked,
+                gs: gs,
+              ),
+              const SizedBox(height: 12),
+            ],
+          );
+        }),
         
         if (kDebugMode) ...[
           const SizedBox(height: 32),
@@ -329,6 +352,114 @@ class _ShopUpgradeCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ClassPurchaseCard extends StatelessWidget {
+  final HeroClass heroClass;
+  final bool isUnlocked;
+  final GameState gs;
+
+  const _ClassPurchaseCard({
+    required this.heroClass,
+    required this.isUnlocked,
+    required this.gs,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final useDiamonds = heroClass.diamondCost > 0;
+    final cost = useDiamonds ? heroClass.diamondCost : heroClass.coinCost;
+    final canAfford = useDiamonds 
+        ? gs.diamonds >= heroClass.diamondCost 
+        : gs.profile.coins >= heroClass.coinCost;
+
+    return Panel(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.black12),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Opacity(
+                opacity: isUnlocked ? 1.0 : 0.6,
+                child: Image.asset(heroClass.imageAsset, fit: BoxFit.cover),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  heroClass.name,
+                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Color(0xFF1A1C1E)),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  heroClass.description,
+                  style: const TextStyle(fontSize: 11, color: Colors.black45),
+                ),
+                const SizedBox(height: 4),
+                _ClassBonusesMiniRow(heroClass: heroClass),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          if (isUnlocked)
+            Icon(Icons.check_circle_rounded, color: scheme.primary)
+          else
+            SizedBox(
+              height: 36,
+              child: FilledButton(
+                onPressed: canAfford ? () => gs.unlockClass(heroClass.id, cost, useDiamonds) : null,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  backgroundColor: scheme.primary.withValues(alpha: 0.1),
+                  foregroundColor: scheme.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(cost.toString(), style: const TextStyle(fontWeight: FontWeight.w900)),
+                    const SizedBox(width: 4),
+                    Icon(useDiamonds ? Icons.diamond_rounded : Icons.monetization_on_rounded, size: 14),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ClassBonusesMiniRow extends StatelessWidget {
+  final HeroClass heroClass;
+  const _ClassBonusesMiniRow({required this.heroClass});
+
+  @override
+  Widget build(BuildContext context) {
+    List<String> b = [];
+    if (heroClass.healthBonus != 0) b.add('HP +${heroClass.healthBonus}');
+    if (heroClass.staminaBonus != 0) b.add('STM +${heroClass.staminaBonus}');
+    if (heroClass.attackBonus != 0) b.add('ATK +${heroClass.attackBonus}');
+    if (heroClass.defenseBonus != 0) b.add('DEF ${heroClass.defenseBonus > 0 ? "+" : ""}${heroClass.defenseBonus}');
+    if (heroClass.speedBonus != 0) b.add('SPD +${heroClass.speedBonus}x');
+
+    return Text(
+      b.join(' • '),
+      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF49454F)),
     );
   }
 }

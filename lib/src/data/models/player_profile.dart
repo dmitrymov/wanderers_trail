@@ -1,4 +1,5 @@
 import 'item.dart';
+import 'hero_class.dart';
 
 class PlayerProfile {
   final String userId; // future login
@@ -31,6 +32,8 @@ class PlayerProfile {
   final Item? boots;
 
   final String? selectedPetId;
+  final String selectedClassId;
+  final List<String> unlockedClassIds;
   final int? savedStep; // last saved run step for Continue
 
   const PlayerProfile({
@@ -56,6 +59,8 @@ class PlayerProfile {
     this.ring,
     this.boots,
     this.selectedPetId,
+    required this.selectedClassId,
+    required this.unlockedClassIds,
     this.savedStep,
   });
 
@@ -84,6 +89,8 @@ class PlayerProfile {
     Object? ring = _unset,
     Object? boots = _unset,
     Object? selectedPetId = _unset,
+    String? selectedClassId,
+    List<String>? unlockedClassIds,
     Object? savedStep = _unset,
   }) => PlayerProfile(
         userId: userId ?? this.userId,
@@ -108,6 +115,8 @@ class PlayerProfile {
         ring: identical(ring, _unset) ? this.ring : ring as Item?,
         boots: identical(boots, _unset) ? this.boots : boots as Item?,
         selectedPetId: identical(selectedPetId, _unset) ? this.selectedPetId : selectedPetId as String?,
+        selectedClassId: selectedClassId ?? this.selectedClassId,
+        unlockedClassIds: unlockedClassIds ?? this.unlockedClassIds,
         savedStep: identical(savedStep, _unset) ? this.savedStep : savedStep as int?,
       );
 
@@ -134,6 +143,8 @@ class PlayerProfile {
         'ring': ring?.toJson(),
         'boots': boots?.toJson(),
         'selectedPetId': selectedPetId,
+        'selectedClassId': selectedClassId,
+        'unlockedClassIds': unlockedClassIds,
         'savedStep': savedStep,
       };
 
@@ -161,6 +172,8 @@ class PlayerProfile {
         ring: json['ring'] == null ? null : Item.fromJson(json['ring'] as Map<String, dynamic>),
         boots: json['boots'] == null ? null : Item.fromJson(json['boots'] as Map<String, dynamic>),
         selectedPetId: json['selectedPetId'] as String?,
+        selectedClassId: json['selectedClassId'] as String? ?? 'survivor',
+        unlockedClassIds: (json['unlockedClassIds'] as List<dynamic>?)?.cast<String>() ?? ['survivor'],
         savedStep: (json['savedStep'] as num?)?.toInt(),
       );
 
@@ -182,6 +195,10 @@ class PlayerProfile {
         permDefenseLevel: 0,
         permSpeedLevel: 0,
         speedMultiplier: 0.1,
+        selectedClassId: 'survivor',
+        unlockedClassIds: const ['survivor'],
         savedStep: null,
       );
+
+  HeroClass get heroClass => HeroClass.get(selectedClassId);
 }

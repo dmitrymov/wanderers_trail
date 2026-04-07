@@ -13,8 +13,8 @@ class AppTokens {
   static const double r12 = 12.0;
 
   // Panel opacity for “Luminous” Look
-  static const double panelOpacity = 0.18;
-  static const double glassBlur = 15.0;
+  static const double panelOpacity = 0.65;
+  static const double glassBlur = 10.0;
 
   // Min tap target height
   static const double minButtonHeight = 48.0;

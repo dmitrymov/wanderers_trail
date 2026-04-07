@@ -5,9 +5,6 @@
 // - UI Layer: Presents the user interface and handles user interactions.
 // - Providers: Used for state management and dependency injection.
 
-import 'dart:async';
-import 'dart:ui';
-
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';

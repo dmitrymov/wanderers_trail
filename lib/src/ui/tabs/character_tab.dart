@@ -6,6 +6,7 @@ import '../../data/models/item.dart';
 import '../../data/models/item_display_helpers.dart';
 import '../../data/models/player_profile.dart';
 import '../../state/game_state.dart';
+import '../../data/models/hero_class.dart';
 import '../widgets/panel.dart';
 
 class CharacterTab extends StatelessWidget {
@@ -32,7 +33,11 @@ class CharacterTab extends StatelessWidget {
               ),
         ),
         const SizedBox(height: 16),
-        _HeroHeader(p: p),
+        InkWell(
+          onTap: () => _showClassSelector(context, gs),
+          borderRadius: BorderRadius.circular(24),
+          child: _HeroHeader(p: p, heroClass: gs.selectedClass),
+        ),
         const SizedBox(height: 20),
         
         _SectionHeader(title: 'VITALS & GROWTH', color: scheme.primary),
@@ -42,8 +47,8 @@ class CharacterTab extends StatelessWidget {
             children: [
               _UpgradeRow(
                 label: 'Health',
-                value: '${p.health} / ${p.maxHealth}',
-                progress: p.health / p.maxHealth,
+                value: '${p.health} / ${gs.totalMaxHealth}',
+                progress: (p.health / gs.totalMaxHealth).clamp(0.0, 1.0),
                 buttonLabel: gs.healthUpgradeCost.toString(),
                 enabled: p.coins >= gs.healthUpgradeCost,
                 onPressed: () => gs.upgradeHealth(),
@@ -56,8 +61,8 @@ class CharacterTab extends StatelessWidget {
               ),
               _UpgradeRow(
                 label: 'Stamina',
-                value: '${p.stamina} / ${p.maxStamina}',
-                progress: p.stamina / p.maxStamina,
+                value: '${p.stamina} / ${gs.totalMaxStamina}',
+                progress: (p.stamina / gs.totalMaxStamina).clamp(0.0, 1.0),
                 buttonLabel: gs.staminaUpgradeCost.toString(),
                 enabled: p.coins >= gs.staminaUpgradeCost,
                 onPressed: () => gs.upgradeStamina(),
@@ -141,14 +146,24 @@ class CharacterTab extends StatelessWidget {
       ],
     );
   }
+  void _showClassSelector(BuildContext context, GameState gs) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _ClassSelectorSheet(gs: gs),
+    );
+  }
 }
 
 class _HeroHeader extends StatelessWidget {
   final PlayerProfile p;
-  const _HeroHeader({required this.p});
+  final HeroClass heroClass;
+  const _HeroHeader({required this.p, required this.heroClass});
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Panel(
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -158,15 +173,14 @@ class _HeroHeader extends StatelessWidget {
             height: 72,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: SweepGradient(
-                colors: [Colors.cyanAccent.withValues(alpha: 0.2), Colors.transparent, Colors.cyanAccent.withValues(alpha: 0.2)],
-              ),
-              border: Border.all(color: Colors.black12, width: 2),
+              border: Border.all(color: scheme.primary.withValues(alpha: 0.1), width: 2),
               boxShadow: [
-                BoxShadow(color: Colors.cyanAccent.withValues(alpha: 0.1), blurRadius: 10, spreadRadius: 2),
+                BoxShadow(color: scheme.primary.withValues(alpha: 0.05), blurRadius: 10, spreadRadius: 2),
               ],
             ),
-            child: const Icon(Icons.person_rounded, size: 40, color: Colors.black38),
+            child: ClipOval(
+              child: Image.asset(heroClass.imageAsset, fit: BoxFit.cover),
+            ),
           ),
           const SizedBox(width: 20),
           Expanded(
@@ -174,51 +188,209 @@ class _HeroHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'THE WANDERER',
+                  'LEGENDARY HERO',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 10,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 2,
-                    color: Colors.cyanAccent.withValues(alpha: 0.7),
+                    color: scheme.primary.withValues(alpha: 0.6),
                   ),
                 ),
-                const Text(
-                  'Survivor',
-                  style: TextStyle(
+                Text(
+                  heroClass.name,
+                  style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
                     color: Color(0xFF1A1C1E),
                   ),
                 ),
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.monetization_on_rounded, size: 14, color: Colors.amberAccent),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${p.coins}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.amberAccent,
-                        ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.stars_rounded, size: 14, color: scheme.primary),
+                    const SizedBox(width: 4),
+                    Text(
+                      'UNLOCKED CLASSES: ${p.unlockedClassIds.length}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurfaceVariant,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
+          Icon(Icons.keyboard_arrow_down_rounded, color: scheme.primary),
         ],
       ),
+    );
+  }
+}
+
+class _ClassSelectorSheet extends StatelessWidget {
+  final GameState gs;
+  const _ClassSelectorSheet({required this.gs});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final classes = HeroClass.allClasses();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(color: Colors.black12, borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Choose Your Path',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF1A1C1E)),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Each class grants permanent stat bonuses.',
+            style: TextStyle(color: Colors.black45),
+          ),
+          const SizedBox(height: 24),
+          Flexible(
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: classes.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, i) {
+                final c = classes[i];
+                final isUnlocked = gs.profile.unlockedClassIds.contains(c.id);
+                final isSelected = gs.profile.selectedClassId == c.id;
+
+                return InkWell(
+                  onTap: isUnlocked ? () {
+                    gs.selectClass(c.id);
+                    Navigator.pop(context);
+                  } : null,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isSelected ? scheme.primary : (isUnlocked ? Colors.black12 : Colors.black.withValues(alpha: 0.05)),
+                        width: 2,
+                      ),
+                      color: isSelected ? scheme.primary.withValues(alpha: 0.05) : (isUnlocked ? Colors.transparent : Colors.black.withValues(alpha: 0.02)),
+                    ),
+                    child: Row(
+                      children: [
+                        Opacity(
+                          opacity: isUnlocked ? 1.0 : 0.4,
+                          child: Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.black12),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.asset(c.imageAsset, fit: BoxFit.cover),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    c.name,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: isUnlocked ? const Color(0xFF1A1C1E) : Colors.black38,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  if (!isUnlocked)
+                                    Icon(Icons.lock_rounded, size: 14, color: Colors.black26),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              _ClassBonusesRow(heroClass: c, isUnlocked: isUnlocked),
+                            ],
+                          ),
+                        ),
+                        if (isSelected)
+                          Icon(Icons.check_circle_rounded, color: scheme.primary),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
+          if (classes.any((c) => !gs.profile.unlockedClassIds.contains(c.id)))
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // In a real app we might switch tabs, but here we just prompt them
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Visit the Shop to unlock more classes!')),
+                );
+              },
+              child: Text('How to unlock more?', style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w700)),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ClassBonusesRow extends StatelessWidget {
+  final HeroClass heroClass;
+  final bool isUnlocked;
+  const _ClassBonusesRow({required this.heroClass, required this.isUnlocked});
+
+  @override
+  Widget build(BuildContext context) {
+    final List<Widget> chips = [];
+    final color = isUnlocked ? const Color(0xFF1D1B20) : Colors.black26;
+
+    if (heroClass.healthBonus != 0) chips.add(_bonusText('HP', heroClass.healthBonus, color));
+    if (heroClass.staminaBonus != 0) chips.add(_bonusText('STM', heroClass.staminaBonus, color));
+    if (heroClass.attackBonus != 0) chips.add(_bonusText('ATK', heroClass.attackBonus, color));
+    if (heroClass.defenseBonus != 0) chips.add(_bonusText('DEF', heroClass.defenseBonus, color));
+    if (heroClass.speedBonus != 0) chips.add(_bonusText('SPD', heroClass.speedBonus, color, isMultiplier: true));
+    if (heroClass.critChanceBonus != 0) chips.add(_bonusText('CRT', heroClass.critChanceBonus, color, isPercent: true));
+
+    if (chips.isEmpty) {
+      return const Text('Standard adventurer stats.', style: TextStyle(fontSize: 12, color: Colors.black45));
+    }
+
+    return Wrap(
+      spacing: 8,
+      children: chips,
+    );
+  }
+
+  Widget _bonusText(String label, num value, Color color, {bool isMultiplier = false, bool isPercent = false}) {
+    final sign = value > 0 ? '+' : '';
+    final valStr = isMultiplier ? '${value.toStringAsFixed(1)}x' : (isPercent ? '${(value * 100).toInt()}%' : value.toString());
+    return Text(
+      '$label: $sign$valStr',
+      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color),
     );
   }
 }
