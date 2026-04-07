@@ -5,18 +5,21 @@ import 'tokens.dart';
 ThemeData buildAppTheme(Brightness brightness) {
   final isDark = brightness == Brightness.dark;
   final baseScheme = ColorScheme.fromSeed(
-    seedColor: const Color(0xFF00897B),
+    seedColor: const Color(0xFF00BFA5), // Vibrant Teal
     brightness: brightness,
   );
 
   final scheme = baseScheme.copyWith(
-    surface: isDark ? const Color(0xFF111318) : baseScheme.surface,
+    primary: const Color(0xFF00897B), // Deeper Teal for light contrast
+    surface: isDark ? const Color(0xFF080A0D) : const Color(0xFFFBFDFB),
     surfaceContainerHighest:
-        isDark ? const Color(0xFF1A1C1E) : baseScheme.surfaceContainerHighest,
+        isDark ? const Color(0xFF12161B) : const Color(0xFFF1F4F1),
+    onSurface: isDark ? Colors.white : const Color(0xFF1D1B20),
+    onSurfaceVariant: isDark ? Colors.white70 : const Color(0xFF49454F),
   );
 
-  final onMuted = scheme.onSurface.withValues(alpha: 0.65);
-  final onSubtle = scheme.onSurface.withValues(alpha: 0.45);
+  final onMuted = scheme.onSurface.withValues(alpha: 0.85);
+  final onSubtle = scheme.onSurface.withValues(alpha: 0.65);
 
   return ThemeData(
     useMaterial3: true,
@@ -125,22 +128,23 @@ ThemeData buildAppTheme(Brightness brightness) {
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      height: 68,
-      indicatorColor: scheme.secondaryContainer,
-      backgroundColor: scheme.surface,
-      surfaceTintColor: Colors.transparent,
+      height: 72,
+      indicatorColor: scheme.primary.withValues(alpha: 0.12),
+      backgroundColor: scheme.surface.withValues(alpha: 0.85),
+      surfaceTintColor: scheme.surface,
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         final selected = states.contains(WidgetState.selected);
         return TextStyle(
-          fontSize: 12,
-          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+          fontSize: 11,
+          letterSpacing: 0.4,
+          fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
           color: selected ? scheme.primary : onSubtle,
         );
       }),
       iconTheme: WidgetStateProperty.resolveWith((states) {
         final selected = states.contains(WidgetState.selected);
         return IconThemeData(
-          size: 24,
+          size: 26,
           color: selected ? scheme.primary : onSubtle,
         );
       }),

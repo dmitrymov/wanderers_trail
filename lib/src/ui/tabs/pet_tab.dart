@@ -3,66 +3,84 @@ import 'package:provider/provider.dart';
 
 import '../../data/models/pet.dart';
 import '../../state/game_state.dart';
-import '../theme/tokens.dart';
+import '../widgets/panel.dart';
 
 class PetTab extends StatelessWidget {
   const PetTab({super.key});
 
-  static List<Widget> _petBuffRows(BuildContext context, Pet pet) {
+  @override
+  Widget build(BuildContext context) {
+    final gs = context.watch<GameState>();
+    final pets = Pet.starterPets();
+    final selectedId = gs.profile.selectedPetId;
     final scheme = Theme.of(context).colorScheme;
-    final accent = scheme.tertiary;
-    TextStyle lineStyle() => TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: accent,
-        );
-    Widget line(IconData icon, String text) => Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, size: 14, color: accent),
-            const SizedBox(width: 6),
-            Expanded(child: Text(text, style: lineStyle())),
-          ],
-        );
-    final rows = <Widget>[];
-    if (pet.staminaRegenBonus > 0) {
-      rows.add(line(
-        Icons.bolt,
-        'Stamina regen +${(pet.staminaRegenBonus * 100).toStringAsFixed(0)}%',
-      ));
-    }
-    if (pet.attackBonus > 0) {
-      rows.add(line(Icons.flash_on, 'Attack +${pet.attackBonus}'));
-    }
-    if (pet.defenseBonus > 0) {
-      rows.add(line(Icons.shield, 'Defense +${pet.defenseBonus}'));
-    }
-    if (pet.accuracyBonus > 0) {
-      rows.add(line(
-        Icons.center_focus_weak,
-        'Accuracy +${(pet.accuracyBonus * 100).toStringAsFixed(0)}%',
-      ));
-    }
-    if (pet.evasionBonus > 0) {
-      rows.add(line(
-        Icons.shuffle,
-        'Evasion +${(pet.evasionBonus * 100).toStringAsFixed(0)}%',
-      ));
-    }
-    if (pet.critChanceBonus > 0) {
-      rows.add(line(
-        Icons.star,
-        'Crit chance +${(pet.critChanceBonus * 100).toStringAsFixed(0)}%',
-      ));
-    }
-    if (pet.critDamageBonus > 0) {
-      rows.add(line(
-        Icons.auto_graph,
-        'Crit damage +${(pet.critDamageBonus * 100).toStringAsFixed(0)}%',
-      ));
-    }
-    return rows;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+      children: [
+        Text(
+          'Pets',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+        ),
+        const SizedBox(height: 16),
+        _SectionHeader(title: 'YOUR COMPANIONS', color: scheme.primary),
+        const SizedBox(height: 8),
+        Text(
+          'Choose a loyal companion to join your journey. Each grants unique passive blessings.',
+          style: TextStyle(fontSize: 12, color: const Color(0xFF44474E), fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 20),
+        for (final pet in pets) ...[
+          _PetSelectionCard(
+            pet: pet,
+            isSelected: selectedId == pet.id,
+            onSelect: () => gs.selectPet(pet.id),
+          ),
+          const SizedBox(height: 12),
+        ],
+      ],
+    );
   }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final Color? color;
+  const _SectionHeader({required this.title, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.2,
+            color: color ?? const Color(0xFF44474E),
+          ),
+        ),
+        const SizedBox(width: 12),
+        const Expanded(child: Divider(color: Colors.black12)),
+      ],
+    );
+  }
+}
+
+class _PetSelectionCard extends StatelessWidget {
+  final Pet pet;
+  final bool isSelected;
+  final VoidCallback onSelect;
+
+  const _PetSelectionCard({
+    required this.pet,
+    required this.isSelected,
+    required this.onSelect,
+  });
 
   String _petEmoji(Pet pet) {
     final name = pet.name.toLowerCase();
@@ -75,154 +93,159 @@ class PetTab extends StatelessWidget {
     if (name.contains('rabbit') || name.contains('bunny')) return '🐰';
     if (name.contains('beetle')) return '🪲';
     if (name.contains('turtle')) return '🐢';
-    const fallbacks = ['🐾', '🦎', '🐦', '🦋', '🐛'];
-    return fallbacks[pet.id.codeUnitAt(0) % fallbacks.length];
+    return '🐾';
   }
 
   @override
   Widget build(BuildContext context) {
-    final gs = context.watch<GameState>();
-    final pets = Pet.starterPets();
-    final selected = gs.profile.selectedPetId;
     final scheme = Theme.of(context).colorScheme;
+    final traits = _getPetTraits(pet);
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      children: [
-        Row(
-          children: [
-            Text('Companions', style: Theme.of(context).textTheme.titleLarge),
-            const Spacer(),
-            if (selected != null)
-              Chip(
-                avatar: Text(
-                  _petEmoji(
-                    pets.firstWhere((p) => p.id == selected,
-                        orElse: () => pets.first),
-                  ),
-                  style: const TextStyle(fontSize: 18),
-                ),
-                label: const Text('Active'),
-                side: BorderSide(color: scheme.outlineVariant),
-                backgroundColor: scheme.primaryContainer.withValues(alpha: 0.55),
-              ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Your companion grants passive bonuses during runs.',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        const SizedBox(height: AppTokens.gap16),
-        for (final pet in pets) ...[
-          _PetCard(
-            pet: pet,
-            emoji: _petEmoji(pet),
-            isSelected: selected == pet.id,
-            onSelect: () => gs.selectPet(pet.id),
-          ),
-          const SizedBox(height: AppTokens.gap8),
-        ],
-      ],
-    );
-  }
-}
-
-class _PetCard extends StatelessWidget {
-  const _PetCard({
-    required this.pet,
-    required this.emoji,
-    required this.isSelected,
-    required this.onSelect,
-  });
-
-  final Pet pet;
-  final String emoji;
-  final bool isSelected;
-  final VoidCallback onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final buffRows = PetTab._petBuffRows(context, pet);
-
-    return AnimatedContainer(
+    return AnimatedScale(
+      scale: isSelected ? 1.02 : 1.0,
       duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOutCubic,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppTokens.r12),
-        border: Border.all(
-          color: isSelected ? scheme.primary : scheme.outlineVariant,
-          width: isSelected ? 2 : 1,
-        ),
-        color: isSelected
-            ? scheme.primaryContainer.withValues(alpha: 0.35)
-            : scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: isSelected ? null : onSelect,
-          borderRadius: BorderRadius.circular(AppTokens.r12),
-          child: Padding(
-            padding: const EdgeInsets.all(AppTokens.gap16),
+      child: GestureDetector(
+        onTap: isSelected ? null : onSelect,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: isSelected ? [
+              BoxShadow(
+                color: scheme.primary.withValues(alpha: 0.2),
+                blurRadius: 16,
+                spreadRadius: 2,
+              )
+            ] : null,
+          ),
+          child: Panel(
+            padding: const EdgeInsets.all(16),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: scheme.surfaceContainerHigh.withValues(alpha: 0.9),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(emoji, style: const TextStyle(fontSize: 30)),
-                ),
-                const SizedBox(width: AppTokens.gap12),
+                _PetAvatar(emoji: _petEmoji(pet), isSelected: isSelected),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          Flexible(
-                            child: Text(
-                              pet.name,
-                              style: Theme.of(context).textTheme.titleMedium,
+                          Text(
+                            pet.name,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            color: isSelected ? scheme.primary : const Color(0xFF191C1B),
                             ),
                           ),
                           if (isSelected) ...[
                             const SizedBox(width: 8),
-                            Icon(Icons.check_circle,
-                                color: scheme.primary, size: 18),
+                            const Icon(Icons.verified_rounded, size: 16, color: Color(0xFF00897B)),
                           ],
                         ],
                       ),
                       const SizedBox(height: 4),
                       Text(
                         pet.description,
-                        style: Theme.of(context).textTheme.bodySmall,
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF44474E)),
                       ),
-                      const SizedBox(height: 8),
-                      for (var i = 0; i < buffRows.length; i++) ...[
-                        buffRows[i],
-                        if (i < buffRows.length - 1) const SizedBox(height: 4),
-                      ],
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: traits.map((t) => _TraitTag(trait: t)).toList(),
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(width: AppTokens.gap8),
                 if (!isSelected)
-                  FilledButton.tonal(
-                    onPressed: onSelect,
-                    child: const Text('Select'),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Icon(Icons.radio_button_off_rounded, color: Colors.black12, size: 20),
                   )
                 else
-                  Icon(Icons.pets, color: scheme.primary, size: 28),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Icon(Icons.pets_rounded, color: scheme.primary, size: 24),
+                  ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  List<_PetTrait> _getPetTraits(Pet pet) {
+    final list = <_PetTrait>[];
+    if (pet.attackBonus > 0) list.add(_PetTrait('ATK +${pet.attackBonus}', Colors.orangeAccent, Icons.flash_on_rounded));
+    if (pet.defenseBonus > 0) list.add(_PetTrait('DEF +${pet.defenseBonus}', Colors.blueAccent, Icons.shield_rounded));
+    if (pet.staminaRegenBonus > 0) list.add(_PetTrait('STM +${(pet.staminaRegenBonus * 100).round()}%', Colors.amberAccent, Icons.bolt_rounded));
+    if (pet.accuracyBonus > 0) list.add(_PetTrait('ACC +${(pet.accuracyBonus * 100).round()}%', Colors.tealAccent, Icons.center_focus_strong_rounded));
+    if (pet.evasionBonus > 0) list.add(_PetTrait('EVA +${(pet.evasionBonus * 100).round()}%', Colors.indigoAccent, Icons.waves_rounded));
+    if (pet.critChanceBonus > 0) list.add(_PetTrait('CRT ${(pet.critChanceBonus * 100).round()}%', Colors.redAccent, Icons.star_rounded));
+    return list;
+  }
+}
+
+class _PetAvatar extends StatelessWidget {
+  final String emoji;
+  final bool isSelected;
+  const _PetAvatar({required this.emoji, required this.isSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 64,
+      height: 64,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: isSelected ? const Color(0xFF00897B).withValues(alpha: 0.5) : Colors.black12,
+          width: 2,
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Text(emoji, style: const TextStyle(fontSize: 32)),
+    );
+  }
+}
+
+class _PetTrait {
+  final String label;
+  final Color color;
+  final IconData icon;
+  _PetTrait(this.label, this.color, this.icon);
+}
+
+class _TraitTag extends StatelessWidget {
+  final _PetTrait trait;
+  const _TraitTag({required this.trait});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: trait.color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: trait.color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(trait.icon, size: 10, color: trait.color),
+          const SizedBox(width: 4),
+          Text(
+            trait.label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: trait.color.withValues(alpha: 0.9),
+            ),
+          ),
+        ],
       ),
     );
   }

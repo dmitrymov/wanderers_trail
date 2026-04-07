@@ -6,6 +6,7 @@
 // - Providers: Used for state management and dependency injection.
 
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -60,7 +61,7 @@ class WanderersApp extends StatelessWidget {
       title: "Wanderer's Trail",
       theme: buildAppTheme(Brightness.light),
       darkTheme: buildAppTheme(Brightness.dark),
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.light,
       home: const HomeScaffold(),
     );
   }
@@ -86,58 +87,70 @@ class _HomeScaffoldState extends State<HomeScaffold> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color.lerp(
-                    scheme.primaryContainer,
-                    scheme.surface,
-                    isDark ? 0.72 : 0.55,
-                  ) ??
+      extendBody: true,
+      body: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFFF0F8F7), // Ultra Soft Mint
                   scheme.surface,
-              scheme.surface,
-            ],
-            stops: const [0.0, 0.42],
+                  const Color(0xFFF9FFF8), // Crystal White
+                ],
+                stops: const [0.0, 0.5, 1.0],
+              ),
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: IndexedStack(
-            index: _index,
-            children: _pages,
-          ),
-        ),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.storefront_outlined),
-            selectedIcon: Icon(Icons.storefront),
-            label: 'Shop',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Character',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.sports_esports_outlined),
-            selectedIcon: Icon(Icons.sports_esports),
-            label: 'Battle',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.pets_outlined),
-            selectedIcon: Icon(Icons.pets),
-            label: 'Pet',
+          SafeArea(
+            child: _pages[_index],
           ),
         ],
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: NavigationBar(
+            selectedIndex: _index,
+            onDestinationSelected: (i) => setState(() => _index = i),
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.storefront_outlined),
+                selectedIcon: Icon(Icons.storefront),
+                label: 'Shop',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.person_outline),
+                selectedIcon: Icon(Icons.person),
+                label: 'Hero',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.sports_esports_outlined),
+                selectedIcon: Icon(Icons.sports_esports),
+                label: 'Battle',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.pets_outlined),
+                selectedIcon: Icon(Icons.pets),
+                label: 'Pet',
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

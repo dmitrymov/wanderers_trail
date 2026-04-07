@@ -12,9 +12,9 @@ class AppTokens {
   static const double r8 = 8.0;
   static const double r12 = 12.0;
 
-  // Panel opacity for “glass” HUD look
-  static const double panelOpacity = 0.65;
-  static const double glassBlur = 12.0;
+  // Panel opacity for “Luminous” Look
+  static const double panelOpacity = 0.18;
+  static const double glassBlur = 15.0;
 
   // Min tap target height
   static const double minButtonHeight = 48.0;
@@ -25,4 +25,9 @@ class AppTokens {
   static const int colorRare = 0xFF2196F3; // Blue
   static const int colorLegendary = 0xFFFF9800; // Orange
   static const int colorMystic = 0xFF9C27B0; // Purple
+  
+  // Premium Effects
+  static const double glowOpacity = 0.45;
+  static const double activeGlowRadius = 14.0;
+  static const double cardSurfaceOpacity = 0.72;
 }

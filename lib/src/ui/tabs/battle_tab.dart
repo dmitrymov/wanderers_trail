@@ -156,7 +156,7 @@ class BattleTab extends StatelessWidget {
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.8,
-                    color: scheme.onSurface,
+                    color: const Color(0xFF1A1C1E),
                   ),
                 ),
                 const SizedBox(height: AppTokens.gap12),
@@ -269,7 +269,7 @@ class _HubStatChip extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(AppTokens.gap8),
               decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.15),
+                color: const Color(0xFFD1E4E2),
                 borderRadius: BorderRadius.circular(AppTokens.r8),
               ),
               child: Icon(icon, size: 20, color: accent),
@@ -278,8 +278,8 @@ class _HubStatChip extends StatelessWidget {
             Text(
               label,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: scheme.onSurface.withValues(alpha: 0.6),
-                fontWeight: FontWeight.w600,
+                color: const Color(0xFF44474E),
+                fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: AppTokens.gap4),
@@ -530,7 +530,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
     if (m == null) return;
     _log(
       'Round $_exchangeRound · ${m.name} −$_dmgToMonsterThisExchange HP · You −$_dmgToPlayerThisExchange HP',
-      Colors.cyanAccent,
+      const Color(0xFF00695C),
     );
     _exchangeRound++;
     _dmgToMonsterThisExchange = 0;
@@ -709,11 +709,11 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
           if (isCrit) {
             _log(
               'Critical hit on ${_monster!.name} for $finalDamage!',
-              Colors.yellowAccent,
+              const Color(0xFFC67100),
               icon: Icons.auto_awesome,
             );
           } else {
-            _log('Hit ${_monster!.name} for $finalDamage.', Colors.greenAccent, icon: Icons.colorize);
+            _log('Hit ${_monster!.name} for $finalDamage.', const Color(0xFF2E7D32), icon: Icons.colorize);
           }
 
           setState(() {
@@ -730,13 +730,13 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
                 final hpPct = gs.cfgNum(['skeleton', 'reassemble', 'hp_percent'], 0.35);
                 final heal = (_monster!.maxHp * hpPct).toInt();
                 _monster = _monster!.hit(-heal); // Heal back
-                _log('Skeleton reassembled with $heal HP!', Colors.white, icon: Icons.refresh);
+                _log('Skeleton reassembled with $heal HP!', const Color(0xFF1A1C1E), icon: Icons.refresh);
                 OverlayService.showToast('Skeleton rattling back to life!');
                 // Spawn "REVIVE" float
                 _floats.add(
                   _DamageFloat(
                     text: 'REASSEMBLE',
-                    color: Colors.white,
+                    color: const Color(0xFF1A1C1E),
                     start: now,
                     duration: const Duration(milliseconds: 1200),
                     xFrac: 0.5,
@@ -759,11 +759,11 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
           // Miss or Evaded float
           final fx = 0.5 + (_rnd.nextDouble() - 0.5) * 0.18;
           final msg = evaded ? 'EVADED' : 'MISS';
-          _log('You ${evaded ? "were evaded by" : "missed"} ${_monster!.name}.', Colors.white38, icon: Icons.close);
+          _log('You ${evaded ? "were evaded by" : "missed"} ${_monster!.name}.', const Color(0xFF42474E).withValues(alpha: 0.6), icon: Icons.close);
           _floats.add(
             _DamageFloat(
               text: msg,
-              color: Colors.white70,
+              color: const Color(0xFF42474E).withValues(alpha: 0.7),
               start: now,
               duration: const Duration(milliseconds: 1000),
               xFrac: fx,

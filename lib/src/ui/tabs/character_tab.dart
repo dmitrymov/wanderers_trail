@@ -1,365 +1,474 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/models/item.dart';
 import '../../data/models/item_display_helpers.dart';
+import '../../data/models/player_profile.dart';
 import '../../state/game_state.dart';
-import '../theme/tokens.dart';
+import '../widgets/panel.dart';
 
 class CharacterTab extends StatelessWidget {
   const CharacterTab({super.key});
-
-  Widget _equipLine(BuildContext context, String label, Item? item) {
-    final scheme = Theme.of(context).colorScheme;
-    final muted = scheme.onSurface.withValues(alpha: 0.65);
-    final subtle = scheme.onSurface.withValues(alpha: 0.45);
-
-    if (item == null) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Text('$label: —', style: TextStyle(color: subtle, fontSize: 14)),
-      );
-    }
-    final color = Color(rarityColorValue(item.rarity));
-    final base = itemBaseStat(item);
-    final extras = item.stats.entries
-        .map((e) => '• ${formatStatEntry(e.key, e.value)}')
-        .join('  ');
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$label: ${item.name}',
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w700,
-              fontSize: 15,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(base, style: TextStyle(fontSize: 13, color: muted)),
-          if (extras.isNotEmpty)
-            Text(extras, style: TextStyle(fontSize: 12, color: subtle)),
-        ],
-      ),
-    );
-  }
-
-  Widget _sectionCard(BuildContext context, {required List<Widget> children}) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(AppTokens.gap16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: children,
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     final gs = context.watch<GameState>();
     final p = gs.profile;
     final scheme = Theme.of(context).colorScheme;
-    final muted = scheme.onSurface.withValues(alpha: 0.7);
 
     if (!gs.assetsReady) {
       return const Center(child: CircularProgressIndicator());
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       children: [
-        Text('Character', style: Theme.of(context).textTheme.titleLarge),
+        Text(
+          'Hero',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+        ),
         const SizedBox(height: 16),
-        _sectionCard(
-          context,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.account_balance_wallet_outlined,
-                    size: 22, color: scheme.primary),
-                const SizedBox(width: 10),
-                Text('Wallet', style: Theme.of(context).textTheme.titleMedium),
-                const Spacer(),
-                Icon(Icons.monetization_on, color: Colors.amber.shade600, size: 22),
-                const SizedBox(width: 6),
-                Text(
-                  '${p.coins}',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
-            const SizedBox(height: AppTokens.gap16),
-            _upgradeRow(
-              context,
-              label: 'Health',
-              value: '${p.health}/${p.maxHealth}',
-              buttonLabel:
-                  'Upgrade +${GameState.healthUpgradeStep} (${gs.healthUpgradeCost}🪙)',
-              enabled: p.coins >= gs.healthUpgradeCost,
-              onPressed: () => gs.upgradeHealth(),
-            ),
-            const SizedBox(height: AppTokens.gap12),
-            _upgradeRow(
-              context,
-              label: 'Stamina',
-              value: '${p.stamina}/${p.maxStamina}',
-              buttonLabel:
-                  'Upgrade +${GameState.staminaUpgradeStep} (${gs.staminaUpgradeCost}🪙)',
-              enabled: p.coins >= gs.staminaUpgradeCost,
-              onPressed: () => gs.upgradeStamina(),
-            ),
-            const SizedBox(height: AppTokens.gap12),
-            _upgradeRow(
-              context,
-              label: 'Combat Speed',
-              value: '${p.speedMultiplier.toStringAsFixed(1)}x / ${gs.maxSpeedMultiplier.toStringAsFixed(1)}x',
-              buttonLabel:
-                  'Upgrade +${GameState.speedUpgradeStep} (${gs.speedUpgradeCost}🪙)',
-              enabled: p.coins >= gs.speedUpgradeCost && gs.maxSpeedMultiplier < 2.0,
-              onPressed: () => gs.upgradeSpeed(),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppTokens.gap12),
-        _sectionCard(
-          context,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.shield_outlined, size: 22, color: scheme.primary),
-                const SizedBox(width: 10),
-                Text('Equipment', style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Tap items in battle to inspect stats.',
-              style: TextStyle(fontSize: 12, color: muted),
-            ),
-            const Divider(height: AppTokens.gap24),
-            _equipLine(context, 'Weapon', p.weapon),
-            _equipLine(context, 'Armor', p.armor),
-            _equipLine(context, 'Ring', p.ring),
-            _equipLine(context, 'Boots', p.boots),
-          ],
-        ),
-        const SizedBox(height: AppTokens.gap12),
-        if (gs.selectedPet != null) ...[
-          _sectionCard(
-            context,
+        _HeroHeader(p: p),
+        const SizedBox(height: 20),
+        
+        _SectionHeader(title: 'VITALS & GROWTH', color: scheme.primary),
+        const SizedBox(height: 12),
+        Panel(
+          child: Column(
             children: [
-              Row(
-                children: [
-                  Icon(Icons.pets, size: 22, color: scheme.primary),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Companion',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ],
+              _UpgradeRow(
+                label: 'Health',
+                value: '${p.health} / ${p.maxHealth}',
+                progress: p.health / p.maxHealth,
+                buttonLabel: gs.healthUpgradeCost.toString(),
+                enabled: p.coins >= gs.healthUpgradeCost,
+                onPressed: () => gs.upgradeHealth(),
+                icon: Icons.favorite_rounded,
+                iconColor: Colors.redAccent,
               ),
-              const SizedBox(height: 8),
-              Text(
-                gs.selectedPet!.name,
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                  color: scheme.primary,
-                ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Divider(height: 1, color: Colors.black12),
               ),
-              const SizedBox(height: 4),
-              Text(
-                gs.selectedPet!.description,
-                style: TextStyle(fontSize: 13, color: muted),
+              _UpgradeRow(
+                label: 'Stamina',
+                value: '${p.stamina} / ${p.maxStamina}',
+                progress: p.stamina / p.maxStamina,
+                buttonLabel: gs.staminaUpgradeCost.toString(),
+                enabled: p.coins >= gs.staminaUpgradeCost,
+                onPressed: () => gs.upgradeStamina(),
+                icon: Icons.bolt_rounded,
+                iconColor: Colors.amberAccent,
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Divider(height: 1, color: Colors.black12),
+              ),
+              _UpgradeRow(
+                label: 'Combat Speed',
+                value: '${p.speedMultiplier.toStringAsFixed(1)}x',
+                progress: p.speedMultiplier / 2.0,
+                buttonLabel: gs.speedUpgradeCost.toString(),
+                enabled: p.coins >= gs.speedUpgradeCost && gs.maxSpeedMultiplier < 2.0,
+                onPressed: () => gs.upgradeSpeed(),
+                icon: Icons.speed_rounded,
+                iconColor: Colors.cyanAccent,
               ),
             ],
           ),
-          const SizedBox(height: AppTokens.gap12),
-        ],
-        _sectionCard(
-          context,
+        ),
+        
+        const SizedBox(height: 24),
+        _SectionHeader(title: 'EQUIPMENT', color: scheme.primary),
+        const SizedBox(height: 12),
+        Row(
           children: [
-            Row(
-              children: [
-                Icon(Icons.analytics_outlined, size: 22, color: scheme.primary),
-                const SizedBox(width: 10),
-                Text(
-                  'Combat summary',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
-            const SizedBox(height: AppTokens.gap12),
-            _statRow(context, Icons.flash_on, 'Attack', '${gs.statsSummary.attack}'),
-            _statRow(context, Icons.shield, 'Defense', '${gs.statsSummary.defense}'),
-            _statRow(
-              context,
-              Icons.speed,
-              'Attack speed',
-              '${gs.statsSummary.attackMs} ms',
-            ),
-            _statRow(
-              context,
-              Icons.center_focus_weak,
-              'Accuracy',
-              '${(gs.statsSummary.accuracy * 100).toStringAsFixed(0)}%',
-            ),
-            _statRow(
-              context,
-              Icons.shield_moon,
-              'Evasion',
-              '${(gs.statsSummary.evasion * 100).toStringAsFixed(0)}%',
-            ),
-            _statRow(
-              context,
-              Icons.star,
-              'Crit chance',
-              '${(gs.statsSummary.critChance * 100).toStringAsFixed(1)}%',
-            ),
-            _statRow(
-              context,
-              Icons.auto_graph,
-              'Crit damage',
-              '+${(gs.statsSummary.critDamage * 100).toStringAsFixed(0)}%',
-            ),
-            _statRow(context, Icons.bar_chart, 'DPS', '${gs.statsSummary.dps}'),
+            Expanded(child: _EquipmentSlot(label: 'Weapon', item: p.weapon, icon: Icons.sports_martial_arts_rounded)),
+            const SizedBox(width: 12),
+            Expanded(child: _EquipmentSlot(label: 'Armor', item: p.armor, icon: Icons.shield_rounded)),
           ],
         ),
-        const SizedBox(height: AppTokens.gap12),
-        _sectionCard(
-          context,
+        const SizedBox(height: 12),
+        Row(
           children: [
-            Row(
-              children: [
-                Icon(Icons.emoji_events_outlined,
-                    color: Colors.amber.shade700, size: 22),
-                const SizedBox(width: 10),
-                Text('Progress', style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: AppTokens.gap8),
-            Row(
-              children: [
-                Text('High score (best step)', style: TextStyle(color: muted)),
-                const Spacer(),
-                Tooltip(
-                  message: 'Highest step reached on any run',
-                  child: Text(
-                    '${p.highScore}',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-              ],
-            ),
+            Expanded(child: _EquipmentSlot(label: 'Ring', item: p.ring, icon: Icons.blur_circular_rounded)),
+            const SizedBox(width: 12),
+            Expanded(child: _EquipmentSlot(label: 'Boots', item: p.boots, icon: Icons.directions_run_rounded)),
           ],
         ),
-        const SizedBox(height: AppTokens.gap12),
-        _sectionCard(
-          context,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.speed, size: 22, color: scheme.primary),
-                const SizedBox(width: 10),
-                Text('Combat speed', style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: AppTokens.gap8),
-            Row(
-              children: [
-                Text('Speed multiplier', style: TextStyle(color: muted)),
-                const Spacer(),
-                Text(
-                  '${p.speedMultiplier.toStringAsFixed(1)}x',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
-            Slider(
-              value: p.speedMultiplier,
-              min: 0.1,
-              max: gs.maxSpeedMultiplier,
-              divisions: (gs.maxSpeedMultiplier * 10 - 1).round(),
-              label: '${p.speedMultiplier.toStringAsFixed(1)}x',
-              onChanged: (val) {
-                context.read<GameState>().setSpeedMultiplier(val);
-              },
-            ),
-            Text(
-              'Upgrade "Combat Speed" above or permanent "Speed" in the Shop to increase this limit.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: muted.withValues(alpha: 0.5),
-                    fontStyle: FontStyle.italic,
+
+        const SizedBox(height: 24),
+        _SectionHeader(title: 'COMBAT STATS', color: scheme.primary),
+        const SizedBox(height: 12),
+        _StatGrid(gs: gs),
+        
+        const SizedBox(height: 24),
+        _SectionHeader(title: 'PREFERENCES', color: scheme.primary),
+        const SizedBox(height: 12),
+        Panel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.auto_fix_high_rounded, size: 18, color: Colors.black45),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Speed Multiplier: ${p.speedMultiplier.toStringAsFixed(1)}x',
+                    style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1A1C1E)),
                   ),
-            ),
-          ],
+                ],
+              ),
+              Slider(
+                value: p.speedMultiplier,
+                min: 0.1,
+                max: gs.maxSpeedMultiplier,
+                activeColor: scheme.primary,
+                divisions: (gs.maxSpeedMultiplier * 10 - 1).round().clamp(1, 100),
+                onChanged: (val) => context.read<GameState>().setSpeedMultiplier(val),
+              ),
+              const Text(
+                'Adjust game pace. Higher limits unlocked in Shop.',
+                style: TextStyle(fontSize: 11, color: Colors.black45),
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
+}
 
-  Widget _upgradeRow(
-    BuildContext context, {
-    required String label,
-    required String value,
-    required String buttonLabel,
-    required bool enabled,
-    required VoidCallback onPressed,
-  }) {
+class _HeroHeader extends StatelessWidget {
+  final PlayerProfile p;
+  const _HeroHeader({required this.p});
+
+  @override
+  Widget build(BuildContext context) {
+    return Panel(
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: SweepGradient(
+                colors: [Colors.cyanAccent.withValues(alpha: 0.2), Colors.transparent, Colors.cyanAccent.withValues(alpha: 0.2)],
+              ),
+              border: Border.all(color: Colors.black12, width: 2),
+              boxShadow: [
+                BoxShadow(color: Colors.cyanAccent.withValues(alpha: 0.1), blurRadius: 10, spreadRadius: 2),
+              ],
+            ),
+            child: const Icon(Icons.person_rounded, size: 40, color: Colors.black38),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'THE WANDERER',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                    color: Colors.cyanAccent.withValues(alpha: 0.7),
+                  ),
+                ),
+                const Text(
+                  'Survivor',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1A1C1E),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.monetization_on_rounded, size: 14, color: Colors.amberAccent),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${p.coins}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.amberAccent,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final Color? color;
+  const _SectionHeader({required this.title, this.color});
+
+  @override
+  Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.2,
+            color: color ?? const Color(0xFF44474E),
+          ),
+        ),
+        const SizedBox(width: 12),
+        const Expanded(child: Divider(color: Colors.black12)),
+      ],
+    );
+  }
+}
+
+class _UpgradeRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final double progress;
+  final String buttonLabel;
+  final bool enabled;
+  final VoidCallback onPressed;
+  final IconData icon;
+  final Color iconColor;
+
+  const _UpgradeRow({
+    required this.label,
+    required this.value,
+    required this.progress,
+    required this.buttonLabel,
+    required this.enabled,
+    required this.onPressed,
+    required this.icon,
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: iconColor, size: 20),
+        ),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: Theme.of(context).textTheme.bodyMedium),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: Theme.of(context).textTheme.titleMedium,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF1A1C1E))),
+                  Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF42474E))),
+                ],
+              ),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 4,
+                  backgroundColor: Colors.black12,
+                  valueColor: AlwaysStoppedAnimation(iconColor.withValues(alpha: 0.7)),
+                ),
               ),
             ],
           ),
         ),
-        const SizedBox(width: AppTokens.gap8),
-        Flexible(
+        const SizedBox(width: 16),
+        SizedBox(
+          height: 32,
           child: FilledButton(
-            onPressed: enabled ? onPressed : null,
-            child: Text(buttonLabel, textAlign: TextAlign.center),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              backgroundColor: iconColor.withValues(alpha: 0.2),
+              foregroundColor: iconColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              onPressed();
+            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(buttonLabel, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+                const SizedBox(width: 4),
+                const Icon(Icons.monetization_on_rounded, size: 10),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
+}
 
-  Widget _statRow(BuildContext context, IconData icon, String label, String value) {
-    final scheme = Theme.of(context).colorScheme;
-    final muted = scheme.onSurface.withValues(alpha: 0.55);
+class _EquipmentSlot extends StatelessWidget {
+  final String label;
+  final Item? item;
+  final IconData icon;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+  const _EquipmentSlot({required this.label, required this.item, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasItem = item != null;
+    final color = hasItem ? Color(rarityColorValue(item!.rarity)) : Colors.white10;
+
+    return Panel(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 14, color: Colors.black38),
+              const SizedBox(width: 6),
+              Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.black45)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: color.withValues(alpha: 0.3)),
+                ),
+                child: hasItem 
+                  ? Padding(
+                      padding: const EdgeInsets.all(4.0),
+                      child: Image.asset(item!.effectiveAssetPath, fit: BoxFit.contain,
+                        errorBuilder: (c,e,s) => Icon(icon, color: color, size: 20),
+                      ),
+                    )
+                  : Icon(icon, color: Colors.black12, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      hasItem ? item!.name : 'Empty',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: hasItem ? color : Colors.black26,
+                      ),
+                    ),
+                    if (hasItem)
+                      Text(
+                        itemBaseStat(item!),
+                        style: const TextStyle(fontSize: 10, color: Colors.black54),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatGrid extends StatelessWidget {
+  final GameState gs;
+  const _StatGrid({required this.gs});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: _StatBox(label: 'Attack', value: gs.statsSummary.attack.toString(), icon: Icons.flash_on_rounded, color: Colors.orangeAccent)),
+            const SizedBox(width: 12),
+            Expanded(child: _StatBox(label: 'Defense', value: gs.statsSummary.defense.toString(), icon: Icons.shield_rounded, color: Colors.blueAccent)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _StatBox(label: 'Interval', value: '${gs.statsSummary.attackMs}ms', icon: Icons.timer_rounded, color: Colors.greenAccent)),
+            const SizedBox(width: 12),
+            Expanded(child: _StatBox(label: 'DPS', value: gs.statsSummary.dps.toString(), icon: Icons.query_stats_rounded, color: Colors.purpleAccent)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _StatBox(label: 'Accuracy', value: '${(gs.statsSummary.accuracy * 100).round()}%', icon: Icons.center_focus_strong_rounded, color: Colors.tealAccent)),
+            const SizedBox(width: 12),
+            Expanded(child: _StatBox(label: 'Evasion', value: '${(gs.statsSummary.evasion * 100).round()}%', icon: Icons.waves_rounded, color: Colors.indigoAccent)),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _StatBox extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const _StatBox({required this.label, required this.value, required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Panel(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: muted),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.75)),
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.w600),
+          Icon(icon, size: 18, color: color.withValues(alpha: 0.6)),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 10, color: Colors.black45, fontWeight: FontWeight.w700)),
+              Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF1A1C1E))),
+            ],
           ),
         ],
       ),

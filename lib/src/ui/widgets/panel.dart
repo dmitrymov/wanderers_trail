@@ -13,18 +13,31 @@ class Panel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       margin: margin,
       decoration: BoxDecoration(
-        // Dark scrim-style background for reliable contrast on bright scenes
-        color: Colors.black.withValues(alpha: AppTokens.panelOpacity),
+        // Frosted Glass: White tint at tokens.panelOpacity
+        color: Colors.white.withValues(alpha: AppTokens.panelOpacity),
         borderRadius: BorderRadius.circular(AppTokens.r12),
-        border: Border.all(color: Colors.white24),
+        border: Border.all(
+          color: isDark 
+              ? Colors.white.withValues(alpha: 0.24) 
+              : Colors.black.withValues(alpha: 0.08),
+        ),
+        boxShadow: isDark ? null : [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppTokens.r12),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+          filter: ImageFilter.blur(sigmaX: AppTokens.glassBlur, sigmaY: AppTokens.glassBlur),
           child: Padding(padding: padding, child: child),
         ),
       ),

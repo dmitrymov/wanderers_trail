@@ -1,189 +1,334 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-
-import '../../state/game_state.dart';
 import '../theme/tokens.dart';
+import '../../state/game_state.dart';
+import '../widgets/panel.dart';
 
 class ShopTab extends StatelessWidget {
   const ShopTab({super.key});
-
-  Widget _upgradeCard(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required int cost,
-    required VoidCallback? onPressed,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(AppTokens.gap16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: scheme.primaryContainer.withValues(alpha: 0.65),
-                borderRadius: BorderRadius.circular(AppTokens.r8),
-              ),
-              child: Icon(Icons.trending_up, color: scheme.onPrimaryContainer),
-            ),
-            const SizedBox(width: AppTokens.gap12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppTokens.gap8),
-            FilledButton(
-              onPressed: onPressed,
-              child: Text('$cost 💎'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     final gs = context.watch<GameState>();
     final scheme = Theme.of(context).colorScheme;
 
-    final healthLevel = gs.permHealthLevel;
-    final staminaLevel = gs.permStaminaLevel;
-    final attackLevel = gs.permAttackLevel;
-    final defenseLevel = gs.permDefenseLevel;
-
-    final healthBonus = healthLevel * GameState.permHealthStep;
-    final staminaBonus = staminaLevel * GameState.permStaminaStep;
-
     final healthCost = gs.permanentUpgradeCost(PermanentUpgrade.health);
     final staminaCost = gs.permanentUpgradeCost(PermanentUpgrade.stamina);
     final attackCost = gs.permanentUpgradeCost(PermanentUpgrade.attack);
     final defenseCost = gs.permanentUpgradeCost(PermanentUpgrade.defense);
+    final speedCost = gs.permanentUpgradeCost(PermanentUpgrade.speed);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+      children: [
+        Text(
+          'Shop',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+        ),
+        const SizedBox(height: 16),
+        _ShopHeader(diamonds: gs.diamonds, coins: gs.profile.coins),
+        const SizedBox(height: 24),
+        
+        _SectionHeader(title: 'PREMIUM ENHANCEMENTS', color: scheme.primary),
+        const SizedBox(height: 8),
+        const Text(
+          'Permanent upgrades that persist across all future runs.',
+          style: TextStyle(
+            fontSize: 12,
+            color: Color(0xFF2D2E30), // Solid deep grey for high contrast
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.3,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        _ShopUpgradeCard(
+          title: 'Imperial Vigor',
+          subtitle: 'Max Health +${GameState.permHealthStep} (Level ${gs.permHealthLevel})',
+          icon: Icons.favorite_rounded,
+          iconColor: Colors.redAccent,
+          cost: healthCost,
+          canAfford: gs.diamonds >= healthCost,
+          onPressed: () => gs.purchasePermanent(PermanentUpgrade.health),
+        ),
+        const SizedBox(height: 12),
+        
+        _ShopUpgradeCard(
+          title: 'Endless Breath',
+          subtitle: 'Max Stamina +${GameState.permStaminaStep} (Level ${gs.permStaminaLevel})',
+          icon: Icons.bolt_rounded,
+          iconColor: Colors.amberAccent,
+          cost: staminaCost,
+          canAfford: gs.diamonds >= staminaCost,
+          onPressed: () => gs.purchasePermanent(PermanentUpgrade.stamina),
+        ),
+        const SizedBox(height: 12),
+
+        _ShopUpgradeCard(
+          title: 'Slayer\'s Edge',
+          subtitle: 'Base Attack +${GameState.permAttackStep} (Level ${gs.permAttackLevel})',
+          icon: Icons.flash_on_rounded,
+          iconColor: Colors.orangeAccent,
+          cost: attackCost,
+          canAfford: gs.diamonds >= attackCost,
+          onPressed: () => gs.purchasePermanent(PermanentUpgrade.attack),
+        ),
+        const SizedBox(height: 12),
+
+        _ShopUpgradeCard(
+          title: 'Titan\'s Resolve',
+          subtitle: 'Base Defense +${GameState.permDefenseStep} (Level ${gs.permDefenseLevel})',
+          icon: Icons.shield_rounded,
+          iconColor: Colors.blueAccent,
+          cost: defenseCost,
+          canAfford: gs.diamonds >= defenseCost,
+          onPressed: () => gs.purchasePermanent(PermanentUpgrade.defense),
+        ),
+        const SizedBox(height: 12),
+
+        _ShopUpgradeCard(
+          title: 'Chronos Blessing',
+          subtitle: 'Max Combat Speed +${GameState.permSpeedStep.toStringAsFixed(1)}x (Level ${gs.profile.permSpeedLevel})',
+          icon: Icons.speed_rounded,
+          iconColor: Colors.cyanAccent,
+          cost: speedCost,
+          canAfford: gs.diamonds >= speedCost,
+          onPressed: () => gs.purchasePermanent(PermanentUpgrade.speed),
+        ),
+        
+        if (kDebugMode) ...[
+          const SizedBox(height: 32),
+          const _SectionHeader(title: 'DEVELOPER TOOLS'),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => gs.addDiamonds(100),
+            icon: const Icon(Icons.bug_report_rounded, size: 18),
+            label: const Text('Add 100 Diamonds'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white38,
+              side: const BorderSide(color: Colors.white10),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ShopHeader extends StatelessWidget {
+  final int diamonds;
+  final int coins;
+  const _ShopHeader({required this.diamonds, required this.coins});
+
+  @override
+  Widget build(BuildContext context) {
+    return Panel(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          Text(
+            'THE ROYAL SHOP',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 4,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _CurrencyDisplay(
+                value: diamonds,
+                icon: Icons.diamond_rounded,
+                color: Colors.cyanAccent,
+                label: 'DIAMONDS',
+              ),
+              const SizedBox(width: 32),
+              _CurrencyDisplay(
+                value: coins,
+                icon: Icons.monetization_on_rounded,
+                color: Colors.amberAccent,
+                label: 'COINS',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CurrencyDisplay extends StatelessWidget {
+  final int value;
+  final IconData icon;
+  final Color color;
+  final String label;
+
+  const _CurrencyDisplay({
+    required this.value,
+    required this.icon,
+    required this.color,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
       children: [
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(child: Text('Shop', style: Theme.of(context).textTheme.titleLarge)),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: scheme.secondaryContainer.withValues(alpha: 0.7),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('💎', style: TextStyle(fontSize: 16, height: 1, color: scheme.onSecondaryContainer)),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${gs.diamonds}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      color: scheme.onSecondaryContainer,
-                    ),
-                  ),
-                ],
+            Icon(icon, color: color, size: 28),
+            const SizedBox(width: 8),
+            Text(
+              value.toString(),
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 6),
         Text(
-          'Coins (this run): ${gs.profile.coins}',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        if (kDebugMode) ...[
-          const SizedBox(height: AppTokens.gap12),
-          OutlinedButton.icon(
-            onPressed: () => gs.addDiamonds(50),
-            icon: const Icon(Icons.bug_report_outlined, size: 18),
-            label: const Text('Add 50 diamonds (debug)'),
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            color: color.withValues(alpha: 0.5),
+            letterSpacing: 1.5,
           ),
-        ],
-        const SizedBox(height: AppTokens.gap16),
-        Text(
-          'Permanent upgrades',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'These persist across new runs.',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        const SizedBox(height: AppTokens.gap12),
-        _upgradeCard(
-          context,
-          title: 'Max health +${GameState.permHealthStep}',
-          subtitle: 'Level $healthLevel · bonus +$healthBonus',
-          cost: healthCost,
-          onPressed: gs.diamonds >= healthCost
-              ? () => gs.purchasePermanent(PermanentUpgrade.health)
-              : null,
-        ),
-        const SizedBox(height: AppTokens.gap8),
-        _upgradeCard(
-          context,
-          title: 'Max stamina +${GameState.permStaminaStep}',
-          subtitle: 'Level $staminaLevel · bonus +$staminaBonus',
-          cost: staminaCost,
-          onPressed: gs.diamonds >= staminaCost
-              ? () => gs.purchasePermanent(PermanentUpgrade.stamina)
-              : null,
-        ),
-        const SizedBox(height: AppTokens.gap8),
-        _upgradeCard(
-          context,
-          title: 'Attack +${GameState.permAttackStep}',
-          subtitle: 'Level $attackLevel · adds to base attack',
-          cost: attackCost,
-          onPressed: gs.diamonds >= attackCost
-              ? () => gs.purchasePermanent(PermanentUpgrade.attack)
-              : null,
-        ),
-        const SizedBox(height: AppTokens.gap8),
-        _upgradeCard(
-          context,
-          title: 'Defense +${GameState.permDefenseStep}',
-          subtitle: 'Level $defenseLevel · adds to base defense',
-          cost: defenseCost,
-          onPressed: gs.diamonds >= defenseCost
-              ? () => gs.purchasePermanent(PermanentUpgrade.defense)
-              : null,
-        ),
-        const SizedBox(height: AppTokens.gap8),
-        _upgradeCard(
-          context,
-          title: 'Combat Speed +${GameState.permSpeedStep.toStringAsFixed(1)}x',
-          subtitle: 'Level ${gs.profile.permSpeedLevel} · max speed limit',
-          cost: gs.permanentUpgradeCost(PermanentUpgrade.speed),
-          onPressed: gs.diamonds >= gs.permanentUpgradeCost(PermanentUpgrade.speed)
-              ? () => gs.purchasePermanent(PermanentUpgrade.speed)
-              : null,
         ),
       ],
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final Color? color;
+  const _SectionHeader({required this.title, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.2,
+            color: color ?? Colors.white70,
+          ),
+        ),
+        const SizedBox(width: 12),
+        const Expanded(child: Divider(color: Colors.white10)),
+      ],
+    );
+  }
+}
+
+class _ShopUpgradeCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color iconColor;
+  final int cost;
+  final bool canAfford;
+  final VoidCallback onPressed;
+
+  const _ShopUpgradeCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.iconColor,
+    required this.cost,
+    required this.canAfford,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Panel(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: AppTokens.panelOpacity),
+              borderRadius: BorderRadius.circular(AppTokens.r12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+            ),
+            child: Icon(icon, color: iconColor, size: 28),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            height: 44,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: canAfford 
+                    ? Colors.cyanAccent.withValues(alpha: 0.15) 
+                    : Colors.white10,
+                foregroundColor: canAfford ? Colors.cyanAccent : Colors.white24,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                side: BorderSide(
+                  color: canAfford ? Colors.cyanAccent.withValues(alpha: 0.3) : Colors.transparent,
+                ),
+              ),
+              onPressed: canAfford 
+                  ? () {
+                      HapticFeedback.lightImpact();
+                      onPressed();
+                    } 
+                  : null,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    cost.toString(),
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.diamond_rounded, size: 14),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
