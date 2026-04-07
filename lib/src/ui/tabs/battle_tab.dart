@@ -190,6 +190,13 @@ class BattleTab extends StatelessWidget {
                       value: canContinue ? 'Step ${gs.profile.savedStep}' : '—',
                       accent: scheme.secondary,
                     ),
+                    const SizedBox(width: AppTokens.gap12),
+                    _HubStatChip(
+                      icon: Icons.monetization_on_rounded,
+                      label: 'Coins',
+                      value: '${gs.profile.coins}',
+                      accent: const Color(0xFFFFD54F),
+                    ),
                   ],
                 ),
                 const SizedBox(height: AppTokens.gap32),
@@ -1118,6 +1125,19 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
     return 2 + (_step ~/ 10);
   }
 
+  static String _monsterTypeEmoji(MonsterType type) {
+    return switch (type) {
+      MonsterType.slime => '🟢',
+      MonsterType.wolf => '🐺',
+      MonsterType.bandit => '🗡️',
+      MonsterType.spider => '🕷️',
+      MonsterType.skeleton => '💀',
+      MonsterType.orc => '👹',
+      MonsterType.ghost => '👻',
+      MonsterType.demon => '😈',
+    };
+  }
+
   void _onMonsterDefeated(GameState gs) {
     final coins = _coinsForKill();
     if (coins > 0) {
@@ -1152,20 +1172,13 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder:
-          (_) => AlertDialog(
-            title: const Text('Defeated'),
-            content: Text('You were defeated on step $_step.'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop(); // close dialog
-                  Navigator.of(context).pop(); // leave battle page
-                },
-                child: const Text('OK'),
-              ),
-            ],
-          ),
+      builder: (_) => _DefeatDialog(
+        step: _step,
+        onConfirm: () {
+          Navigator.of(context).pop(); // close dialog
+          Navigator.of(context).pop(); // leave battle page
+        },
+      ),
     );
   }
 
@@ -1275,8 +1288,35 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Battle'),
-          backgroundColor: Colors.black87,
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.terrain_rounded, size: 18, color: Colors.white70),
+              const SizedBox(width: 8),
+              Text(
+                'Step $_step',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 17,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
+          ),
+          centerTitle: true,
+          backgroundColor: Colors.black.withValues(alpha: 0.75),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          flexibleSpace: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xCC000000), Color(0x66000000)],
+              ),
+            ),
+          ),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: _requestLeave,
@@ -1284,13 +1324,13 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
           actions: [
             IconButton(
               tooltip: 'Character',
-              icon: const Icon(Icons.person, color: Colors.white),
+              icon: const Icon(Icons.person_rounded, color: Colors.white),
               onPressed: _openCharacterSheet,
             ),
-            TextButton.icon(
+            IconButton(
+              tooltip: 'Leave',
+              icon: const Icon(Icons.logout_rounded, color: Colors.white70),
               onPressed: _requestLeave,
-              icon: const Icon(Icons.exit_to_app, color: Colors.white),
-              label: const Text('Leave', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -1305,7 +1345,12 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
               child: Stack(
                 children: [
                   // Immersive Living Parallax Environment
-                  Positioned.fill(child: _ParallaxEnvironment(offset: totalOffset)),
+                  Positioned.fill(
+                    child: _ParallaxEnvironment(
+                      offset: totalOffset,
+                      advanceProgress: _worldController.value,
+                    ),
+                  ),
                   if (_encounterBanner != null)
                     Positioned(
                       top: 8,
@@ -1489,13 +1534,25 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
                                             child: Column(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                Text(
-                                                  m.name,
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 20,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    Text(
+                                                      _monsterTypeEmoji(m.type),
+                                                      style: const TextStyle(fontSize: 16),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      m.name,
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 20,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    _TierStars(tier: m.tier),
+                                                  ],
                                                 ),
                                                 const SizedBox(height: 8),
                                                 _MonsterPortrait(
@@ -1525,6 +1582,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
                                                     current: m.hp,
                                                     max: m.maxHp,
                                                     damageFlashKey: _monsterHitVersion,
+                                                    showPercent: true,
                                                   ),
                                                 ),
                                                 const SizedBox(height: 6),
@@ -1680,18 +1738,31 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
                                 child: Row(
                                   children: [
                                     Expanded(
-                                      child: ElevatedButton(
+                                      child: ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: _monster == null
+                                              ? const Color(0xFF1A6B3C)
+                                              : Colors.grey.withValues(alpha: 0.3),
+                                          foregroundColor: Colors.white,
+                                          disabledBackgroundColor: Colors.grey.withValues(alpha: 0.2),
+                                          disabledForegroundColor: Colors.white38,
+                                        ),
                                         onPressed: _monster == null ? () => _advance(gs) : null,
-                                        child: Text(_monster == null ? 'Advance' : 'Fighting...'),
+                                        icon: Icon(
+                                          _monster == null ? Icons.arrow_forward_rounded : Icons.sports_martial_arts_rounded,
+                                          size: 18,
+                                        ),
+                                        label: Text(_monster == null ? 'Advance' : 'Fighting...'),
                                       ),
                                     ),
                                     if (_monster != null) ...[
                                       const SizedBox(width: 12),
                                       Expanded(
-                                        child: ElevatedButton(
-                                          style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.black),
-                                          onPressed: _canPowerStrike ? () => _performPowerStrike(gs) : null,
-                                          child: _canPowerStrike ? const Text('Power Strike') : Text('${(_powerStrikeCooldownSec - DateTime.now().difference(_lastPowerStrike!).inSeconds)}s'),
+                                        child: _PowerStrikeButton(
+                                          canStrike: _canPowerStrike,
+                                          cooldownSec: _powerStrikeCooldownSec,
+                                          lastStrike: _lastPowerStrike,
+                                          onPressed: () => _performPowerStrike(gs),
                                         ),
                                       ),
                                     ],
@@ -2092,61 +2163,113 @@ class _MonsterHpBar extends StatelessWidget {
     required this.current,
     required this.max,
     this.damageFlashKey = 0,
+    this.showPercent = false,
   });
 
   final int current;
   final int max;
   final int damageFlashKey;
+  final bool showPercent;
 
   @override
   Widget build(BuildContext context) {
     final pct = (current / max).clamp(0, 1).toDouble();
-    return LayoutBuilder(
-      builder: (context, c) {
-        final w = c.maxWidth;
-        final rawFill = w * pct;
-        final fillW = pct <= 0 ? 0.0 : (rawFill < 1 ? 1.0 : rawFill);
-        return SizedBox(
-          height: 18,
-          width: w,
-          child: Stack(
+    // Color transitions: green > yellow > orange > red as HP drops
+    final barColor = pct > 0.6
+        ? const Color(0xFFEF5350)
+        : pct > 0.35
+            ? const Color(0xFFFF7043)
+            : const Color(0xFFFF1744);
+    final barColorLight = pct > 0.6
+        ? const Color(0xFFEF9A9A)
+        : pct > 0.35
+            ? const Color(0xFFFFAB91)
+            : const Color(0xFFFF616F);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (showPercent)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(9),
-                child: ColoredBox(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  child: SizedBox(width: w, height: 18),
+              const Text(
+                'HP',
+                style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w700),
+              ),
+              Text(
+                '$current / $max  (${(pct * 100).round()}%)',
+                style: TextStyle(
+                  color: barColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              Positioned(
-                left: 0,
-                top: 0,
-                width: fillW,
-                height: 18,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(9),
-                  child: const ColoredBox(color: Colors.redAccent),
-                ),
-              ),
-              if (damageFlashKey > 0)
-                Positioned.fill(
-                  child: ClipRRect(
+            ],
+          ),
+        if (showPercent) const SizedBox(height: 4),
+        LayoutBuilder(
+          builder: (context, c) {
+            final w = c.maxWidth;
+            final rawFill = w * pct;
+            final fillW = pct <= 0 ? 0.0 : (rawFill < 1 ? 1.0 : rawFill);
+            return SizedBox(
+              height: 18,
+              width: w,
+              child: Stack(
+                children: [
+                  ClipRRect(
                     borderRadius: BorderRadius.circular(9),
-                    child: TweenAnimationBuilder<double>(
-                      key: ValueKey(damageFlashKey),
-                      tween: Tween(begin: 0.55, end: 0.0),
-                      duration: const Duration(milliseconds: 420),
-                      curve: Curves.easeOut,
-                      builder: (_, flash, __) => ColoredBox(
-                        color: Colors.white.withValues(alpha: flash),
+                    child: ColoredBox(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      child: SizedBox(width: w, height: 18),
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    width: fillW,
+                    height: 18,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(9),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [barColor, barColorLight],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: barColor.withValues(alpha: 0.5),
+                              blurRadius: 6,
+                              spreadRadius: 0,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
-          ),
-        );
-      },
+                  if (damageFlashKey > 0)
+                    Positioned.fill(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(9),
+                        child: TweenAnimationBuilder<double>(
+                          key: ValueKey(damageFlashKey),
+                          tween: Tween(begin: 0.55, end: 0.0),
+                          duration: const Duration(milliseconds: 420),
+                          curve: Curves.easeOut,
+                          builder: (_, flash, __) => ColoredBox(
+                            color: Colors.white.withValues(alpha: flash),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }
@@ -2352,51 +2475,114 @@ class _BattleLogList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (logs.isEmpty) return const SizedBox.shrink();
+    if (logs.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.black38,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: const Center(
+          child: Text(
+            'Combat events will appear here…',
+            style: TextStyle(color: Colors.white24, fontSize: 12),
+          ),
+        ),
+      );
+    }
     return Container(
       margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: Colors.black45,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.white10),
       ),
-      child: ListView.builder(
-        controller: controller,
-        padding: EdgeInsets.zero,
-        itemCount: logs.length,
-        itemBuilder: (context, index) {
-          final log = logs[index];
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Log header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (log.icon != null) ...[
-                  Icon(log.icon, size: 14, color: log.color),
-                  const SizedBox(width: 8),
-                ],
-                Expanded(
-                  child: Text(
-                    log.text,
-                    style: TextStyle(
-                      color: log.color,
-                      fontSize: 13,
-                      fontWeight: log.color != Colors.white38 ? FontWeight.w600 : FontWeight.normal,
-                      shadows: const [
-                        Shadow(
-                          color: Colors.black,
-                          offset: Offset(1, 1),
-                          blurRadius: 2,
-                        ),
-                      ],
-                    ),
+                const Icon(Icons.article_outlined, size: 13, color: Colors.white38),
+                const SizedBox(width: 6),
+                const Text(
+                  'BATTLE LOG',
+                  style: TextStyle(
+                    color: Colors.white38,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
                   ),
+                ),
+                const Spacer(),
+                Text(
+                  '${logs.length} events',
+                  style: const TextStyle(color: Colors.white24, fontSize: 10),
                 ),
               ],
             ),
-          );
-        },
+          ),
+          const Divider(height: 1, color: Colors.white10),
+          Expanded(
+            child: ListView.builder(
+              controller: controller,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              itemCount: logs.length,
+              itemBuilder: (context, index) {
+                final log = logs[index];
+                final isEven = index % 2 == 0;
+                return Container(
+                  color: isEven ? Colors.white.withValues(alpha: 0.03) : Colors.transparent,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Entry number badge
+                      SizedBox(
+                        width: 22,
+                        child: Text(
+                          '${index + 1}',
+                          style: const TextStyle(
+                            color: Colors.white24,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (log.icon != null) ...[
+                        Icon(log.icon, size: 13, color: log.color),
+                        const SizedBox(width: 6),
+                      ] else
+                        const SizedBox(width: 19),
+                      Expanded(
+                        child: Text(
+                          log.text,
+                          style: TextStyle(
+                            color: log.color,
+                            fontSize: 12.5,
+                            fontWeight: log.color != Colors.white38 ? FontWeight.w600 : FontWeight.normal,
+                            shadows: const [
+                              Shadow(
+                                color: Colors.black,
+                                offset: Offset(1, 1),
+                                blurRadius: 2,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2451,90 +2637,45 @@ class ShakeWidgetState extends State<ShakeWidget>
 
 class _ParallaxEnvironment extends StatelessWidget {
   final double offset;
+  final double advanceProgress;
 
-  const _ParallaxEnvironment({required this.offset});
+  const _ParallaxEnvironment({
+    required this.offset,
+    required this.advanceProgress,
+  });
 
   @override
   Widget build(BuildContext context) {
+    // Walking bob: subtle vertical oscillation during advancement
+    final bob = advanceProgress > 0 ? sin(advanceProgress * pi * 2) * 8.0 : 0.0;
+
     return Stack(
       children: [
-        // Sky Gradient: Sunset/Golden Hour
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                const Color(0xFF1A0B2E), // Deep Violet
-                const Color(0xFFE67E22), // Warm Orange
-                const Color(0xFFFFD97D), // Soft Yellow/Horizon
-              ],
-              stops: const [0.0, 0.6, 1.0],
+        // Background Image Layer with horizontal wrapping
+        _ParallaxLayer(
+          offset: offset,
+          speed: 1.0,
+          child: Transform.translate(
+            offset: Offset(0, bob),
+            child: Image.asset(
+              'assets/images/backgrounds/battle_bg.png',
+              repeat: ImageRepeat.repeatX,
+              fit: BoxFit.cover,
+              height: double.infinity,
+              width: double.infinity,
+              alignment: Alignment.centerLeft,
             ),
           ),
         ),
-        // Glow Sun
-        _ParallaxLayer(
-          offset: offset,
-          speed: 0.02,
-          child: Center(
+        // Wind Particles / Speed Lines
+        Positioned.fill(
+          child: IgnorePointer(
             child: CustomPaint(
-              size: const Size(600, 600),
-              painter: _SunPainter(),
-            ),
-          ),
-        ),
-        // Distant Clouds
-        _ParallaxLayer(
-          offset: offset,
-          speed: 0.05,
-          child: SizedBox(
-            width: 400,
-            height: 200,
-            child: CustomPaint(
-              painter: _CloudPainter(color: Colors.white.withValues(alpha: 0.08)),
-            ),
-          ),
-        ),
-        // Distant Rolling Hills
-        _ParallaxLayer(
-          offset: offset,
-          speed: 0.15,
-          child: SizedBox(
-            height: 400,
-            width: 800,
-            child: CustomPaint(
-              painter: _HillPainter(
-                color: const Color(0xFF4D3B2A).withValues(alpha: 0.4),
-                baseline: 0.7,
+              painter: _WindParticlePainter(
+                offset: offset,
+                isAdvancing: advanceProgress > 0.01,
+                advanceProgress: advanceProgress,
               ),
-            ),
-          ),
-        ),
-        // Midground Mounds
-        _ParallaxLayer(
-          offset: offset,
-          speed: 0.35,
-          child: SizedBox(
-            height: 300,
-            width: 1000,
-            child: CustomPaint(
-              painter: _HillPainter(
-                color: const Color(0xFF2D1F15).withValues(alpha: 0.6),
-                baseline: 0.8,
-              ),
-            ),
-          ),
-        ),
-        // Atmospheric Motes (Pollen/Dust)
-        _ParallaxLayer(
-          offset: offset,
-          speed: 0.8,
-          child: SizedBox(
-            width: 1200,
-            height: 800,
-            child: CustomPaint(
-              painter: _MotePainter(seed: 42),
             ),
           ),
         ),
@@ -2547,7 +2688,7 @@ class _ParallaxEnvironment extends StatelessWidget {
                 radius: 1.4,
                 colors: [
                   Colors.transparent,
-                  Colors.black.withValues(alpha: 0.3),
+                  Colors.black.withValues(alpha: 0.35),
                 ],
               ),
             ),
@@ -2567,107 +2708,312 @@ class _ParallaxLayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Basic infinite wrapping
-    const double width = 1200; 
+    // Basic infinite wrapping for images
+    // We use a larger width to ensure no gaps during fast movement
+    const double width = 2400; 
     final x = -(offset * speed) % width;
     
     return Stack(
       children: [
-        Transform.translate(offset: Offset(x, 80), child: child),
-        Transform.translate(offset: Offset(x + width, 80), child: child),
-        Transform.translate(offset: Offset(x - width, 80), child: child),
+        Positioned.fill(
+          left: x,
+          child: child,
+        ),
+        Positioned.fill(
+          left: x + width,
+          child: child,
+        ),
+        Positioned.fill(
+          left: x - width,
+          child: child,
+        ),
       ],
     );
   }
 }
 
-class _CloudPainter extends CustomPainter {
-  final Color color;
-  _CloudPainter({required this.color});
+class _WindParticlePainter extends CustomPainter {
+  final double offset;
+  final bool isAdvancing;
+  final double advanceProgress;
+
+  _WindParticlePainter({
+    required this.offset,
+    required this.isAdvancing,
+    required this.advanceProgress,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    canvas.drawCircle(Offset(size.width * 0.3, size.height * 0.5), size.height * 0.4, paint);
-    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.4), size.height * 0.5, paint);
-    canvas.drawCircle(Offset(size.width * 0.7, size.height * 0.5), size.height * 0.4, paint);
-    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.6), size.height * 0.35, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _SunPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
+    final rnd = Random(42);
     final paint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          const Color(0xFFFFD97D),
-          const Color(0xFFFFD97D).withValues(alpha: 0.0),
-        ],
-        stops: const [0.2, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: size.width / 2));
-    
-    canvas.drawCircle(center, size.width / 2, paint);
-    
-    // Core Sun
-    canvas.drawCircle(
-      center, 
-      size.width * 0.08, 
-      Paint()..color = const Color(0xFFFEF9E7)
-    );
-  }
+      ..color = Colors.white.withValues(alpha: isAdvancing ? 0.25 : 0.1)
+      ..strokeWidth = 1.2;
 
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
+    final particleCount = isAdvancing ? 60 : 25;
+    final speedMult = isAdvancing ? 4.0 : 1.0;
 
-class _HillPainter extends CustomPainter {
-  final Color color;
-  final double baseline;
-  _HillPainter({required this.color, required this.baseline});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    final path = Path();
-    final h = size.height;
-    final w = size.width;
-
-    path.moveTo(0, h);
-    path.lineTo(0, h * baseline);
-    path.quadraticBezierTo(w * 0.25, h * (baseline - 0.15), w * 0.5, h * baseline);
-    path.quadraticBezierTo(w * 0.75, h * (baseline + 0.1), w, h * (baseline - 0.05));
-    path.lineTo(w, h);
-    path.close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _MotePainter extends CustomPainter {
-  final int seed;
-  _MotePainter({required this.seed});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rnd = Random(seed);
-    final paint = Paint()..color = Colors.white.withValues(alpha: 0.15);
-    
-    for (int i = 0; i < 40; i++) {
-      final x = rnd.nextDouble() * size.width;
+    for (int i = 0; i < particleCount; i++) {
+      final xBase = rnd.nextDouble() * size.width;
       final y = rnd.nextDouble() * size.height;
-      final radius = rnd.nextDouble() * 2.0;
-      canvas.drawCircle(Offset(x, y), radius, paint);
+      
+      // Horizontal flow based on offset and speed multiplier
+      final x = (xBase - (offset * 1.5 * speedMult)) % size.width;
+      
+      // Draw elongated speed lines during movement, dots otherwise
+      if (isAdvancing) {
+        final lineLen = 15.0 + rnd.nextDouble() * 25.0;
+        canvas.drawLine(
+          Offset(x, y),
+          Offset(x + lineLen, y),
+          paint,
+        );
+      } else {
+        canvas.drawCircle(Offset(x, y), 1.0, paint);
+      }
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _WindParticlePainter oldDelegate) => 
+    oldDelegate.offset != offset || oldDelegate.isAdvancing != isAdvancing;
+}
+
+/// Displays 1-3 star icons based on tier value for monster difficulty indication.
+class _TierStars extends StatelessWidget {
+  final int tier;
+  const _TierStars({required this.tier});
+
+  @override
+  Widget build(BuildContext context) {
+    final stars = (tier < 3 ? 1 : tier < 8 ? 2 : 3);
+    final color = tier < 3
+        ? Colors.white54
+        : tier < 8
+            ? Colors.amber
+            : Colors.orangeAccent;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(
+        stars,
+        (i) => Icon(Icons.star_rounded, size: 12, color: color),
+      ),
+    );
+  }
+}
+
+/// Animated Power Strike button with a cooldown ring progress indicator.
+class _PowerStrikeButton extends StatefulWidget {
+  final bool canStrike;
+  final int cooldownSec;
+  final DateTime? lastStrike;
+  final VoidCallback onPressed;
+
+  const _PowerStrikeButton({
+    required this.canStrike,
+    required this.cooldownSec,
+    required this.lastStrike,
+    required this.onPressed,
+  });
+
+  @override
+  State<_PowerStrikeButton> createState() => _PowerStrikeButtonState();
+}
+
+class _PowerStrikeButtonState extends State<_PowerStrikeButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.canStrike) {
+      return AnimatedBuilder(
+        animation: _pulseController,
+        builder: (context, child) {
+          final glow = 0.4 + _pulseController.value * 0.6;
+          return Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.orange.withValues(alpha: glow * 0.5),
+                  blurRadius: 12 * glow,
+                  spreadRadius: 2 * glow,
+                ),
+              ],
+            ),
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE65100),
+                foregroundColor: Colors.white,
+                elevation: 4,
+              ),
+              onPressed: widget.onPressed,
+              icon: const Icon(Icons.flash_on_rounded, size: 18),
+              label: const Text(
+                'Power Strike',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    // Cooldown mode: show ring progress
+    final elapsed = widget.lastStrike == null
+        ? widget.cooldownSec.toDouble()
+        : DateTime.now().difference(widget.lastStrike!).inMilliseconds /
+            1000.0;
+    final progress = (elapsed / widget.cooldownSec).clamp(0.0, 1.0);
+    final remaining = (widget.cooldownSec - elapsed).ceil().clamp(0, widget.cooldownSec);
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.grey.withValues(alpha: 0.3),
+            foregroundColor: Colors.white54,
+            disabledBackgroundColor: Colors.grey.withValues(alpha: 0.2),
+            disabledForegroundColor: Colors.white38,
+          ),
+          onPressed: null,
+          icon: const Icon(Icons.flash_on_rounded, size: 18),
+          label: Text(
+            '${remaining}s',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        Positioned(
+          right: 6,
+          top: 6,
+          child: SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              value: progress,
+              strokeWidth: 2,
+              backgroundColor: Colors.white12,
+              color: Colors.orangeAccent,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Styled defeat dialog with icon, step summary, and back action.
+class _DefeatDialog extends StatelessWidget {
+  final int step;
+  final VoidCallback onConfirm;
+
+  const _DefeatDialog({required this.step, required this.onConfirm});
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A0A0A),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.red.withValues(alpha: 0.4), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.red.withValues(alpha: 0.25),
+              blurRadius: 32,
+              spreadRadius: 4,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Icon
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.red.withValues(alpha: 0.15),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.4), width: 1.5),
+              ),
+              child: const Icon(
+                Icons.heart_broken_rounded,
+                color: Colors.redAccent,
+                size: 36,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Defeated',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You fell on step $step.',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                const Icon(Icons.terrain_rounded, size: 14, color: Colors.white38),
+                const SizedBox(width: 6),
+                Text(
+                  'Furthest reached: Step $step',
+                  style: const TextStyle(color: Colors.white38, fontSize: 12),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF8B0000),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: onConfirm,
+                icon: const Icon(Icons.arrow_back_rounded),
+                label: const Text(
+                  'Return to Hub',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
