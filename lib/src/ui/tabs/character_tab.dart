@@ -92,17 +92,45 @@ class CharacterTab extends StatelessWidget {
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _EquipmentSlot(label: 'Weapon', item: p.weapon, icon: Icons.sports_martial_arts_rounded)),
+            Expanded(
+              child: _EquipmentSlot(
+                label: 'Weapon',
+                item: p.weapon,
+                icon: Icons.sports_martial_arts_rounded,
+                onTap: () => _showRelicPicker(context, gs, ItemType.weapon),
+              ),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: _EquipmentSlot(label: 'Armor', item: p.armor, icon: Icons.shield_rounded)),
+            Expanded(
+              child: _EquipmentSlot(
+                label: 'Armor',
+                item: p.armor,
+                icon: Icons.shield_rounded,
+                onTap: () => _showRelicPicker(context, gs, ItemType.armor),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _EquipmentSlot(label: 'Ring', item: p.ring, icon: Icons.blur_circular_rounded)),
+            Expanded(
+              child: _EquipmentSlot(
+                label: 'Ring',
+                item: p.ring,
+                icon: Icons.blur_circular_rounded,
+                onTap: () => _showRelicPicker(context, gs, ItemType.ring),
+              ),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: _EquipmentSlot(label: 'Boots', item: p.boots, icon: Icons.directions_run_rounded)),
+            Expanded(
+              child: _EquipmentSlot(
+                label: 'Boots',
+                item: p.boots,
+                icon: Icons.directions_run_rounded,
+                onTap: () => _showRelicPicker(context, gs, ItemType.boots),
+              ),
+            ),
           ],
         ),
 
@@ -152,6 +180,15 @@ class CharacterTab extends StatelessWidget {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) => _ClassSelectorSheet(gs: gs),
+    );
+  }
+
+  void _showRelicPicker(BuildContext context, GameState gs, ItemType type) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _RelicPickerSheet(gs: gs, type: type),
     );
   }
 }
@@ -512,70 +549,219 @@ class _EquipmentSlot extends StatelessWidget {
   final String label;
   final Item? item;
   final IconData icon;
+  final VoidCallback? onTap;
 
-  const _EquipmentSlot({required this.label, required this.item, required this.icon});
+  const _EquipmentSlot({required this.label, required this.item, required this.icon, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final hasItem = item != null;
-    final color = hasItem ? Color(rarityColorValue(item!.rarity)) : Colors.white10;
+    final color = hasItem ? Color(rarityColorValue(item!.rarity)) : Colors.black12;
 
     return Panel(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      padding: EdgeInsets.zero,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, size: 14, color: Colors.black38),
-              const SizedBox(width: 6),
-              Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.black45)),
+              Row(
+                children: [
+                  Icon(icon, size: 14, color: Colors.black38),
+                  const SizedBox(width: 6),
+                  Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.black45)),
+                  const Spacer(),
+                  const Icon(Icons.swap_horiz_rounded, size: 12, color: Colors.black12),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: color.withValues(alpha: 0.3)),
+                    ),
+                    child: hasItem 
+                      ? Padding(
+                          padding: const EdgeInsets.all(4.0),
+                          child: Image.asset(item!.effectiveAssetPath, fit: BoxFit.contain,
+                            errorBuilder: (c,e,s) => Icon(icon, color: color, size: 20),
+                          ),
+                        )
+                      : Icon(icon, color: Colors.black12, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          hasItem ? item!.name : 'Empty',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: hasItem ? color : Colors.black26,
+                          ),
+                        ),
+                        if (hasItem)
+                          Text(
+                            itemBaseStat(item!),
+                            style: const TextStyle(fontSize: 10, color: Colors.black54),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: color.withValues(alpha: 0.3)),
-                ),
-                child: hasItem 
-                  ? Padding(
-                      padding: const EdgeInsets.all(4.0),
-                      child: Image.asset(item!.effectiveAssetPath, fit: BoxFit.contain,
-                        errorBuilder: (c,e,s) => Icon(icon, color: color, size: 20),
-                      ),
-                    )
-                  : Icon(icon, color: Colors.black12, size: 20),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      hasItem ? item!.name : 'Empty',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: hasItem ? color : Colors.black26,
+        ),
+      ),
+    );
+  }
+}
+
+class _RelicPickerSheet extends StatelessWidget {
+  final GameState gs;
+  final ItemType type;
+  const _RelicPickerSheet({required this.gs, required this.type});
+
+  @override
+  Widget build(BuildContext context) {
+    final relics = gs.profile.relics.where((r) => r.type == type).toList()
+      ..sort((a, b) => b.rarity.index.compareTo(a.rarity.index));
+    
+    final typeName = switch (type) {
+      ItemType.weapon => 'Weapon',
+      ItemType.armor => 'Armor',
+      ItemType.ring => 'Ring',
+      ItemType.boots => 'Boots',
+    };
+
+    final currentSlot = switch (type) {
+      ItemType.weapon => gs.profile.weapon,
+      ItemType.armor => gs.profile.armor,
+      ItemType.ring => gs.profile.ring,
+      ItemType.boots => gs.profile.boots,
+    };
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 40),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF7F8FA),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.black12,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'SELECT ${typeName.toUpperCase()} RELIC',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.2,
+              color: Colors.black38,
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (relics.isEmpty)
+             const Padding(
+               padding: EdgeInsets.symmetric(vertical: 40),
+               child: Text('No relics found. Open chests in the Shop!', style: TextStyle(color: Colors.black26)),
+             )
+          else
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: relics.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final r = relics[index];
+                  final isEquipped = currentSlot?.id == r.id;
+                  final rColor = Color(rarityColorValue(r.rarity));
+
+                  return Panel(
+                    padding: EdgeInsets.zero,
+                    child: InkWell(
+                      onTap: () {
+                        gs.equipRelic(r);
+                        Navigator.pop(context);
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: isEquipped ? Border.all(color: rColor, width: 2) : null,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: rColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(6.0),
+                                child: Image.asset(r.effectiveAssetPath, fit: BoxFit.contain,
+                                  errorBuilder: (c,e,s) => Icon(Icons.help_outline, color: rColor),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(r.name, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: rColor)),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${itemBaseStat(r)} • ${r.rarity.name.toUpperCase()}',
+                                    style: const TextStyle(fontSize: 11, color: Colors.black45, fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isEquipped)
+                              const Icon(Icons.check_circle_rounded, color: Colors.greenAccent),
+                          ],
+                        ),
                       ),
                     ),
-                    if (hasItem)
-                      Text(
-                        itemBaseStat(item!),
-                        style: const TextStyle(fontSize: 10, color: Colors.black54),
-                      ),
-                  ],
-                ),
+                  );
+                },
               ),
-            ],
+            ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(double.infinity, 56),
+              backgroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            child: const Text('Back'),
           ),
         ],
       ),

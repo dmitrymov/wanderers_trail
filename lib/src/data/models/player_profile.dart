@@ -41,6 +41,7 @@ class PlayerProfile {
   final String? selectedPetId;
   final String selectedClassId;
   final List<String> unlockedClassIds;
+  final List<Item> relics;
   final int? savedStep; // last saved run step for Continue
   final bool hasEquipmentBeenSeparated; // One-time migration flag
 
@@ -75,6 +76,7 @@ class PlayerProfile {
     this.selectedPetId,
     required this.selectedClassId,
     required this.unlockedClassIds,
+    this.relics = const [],
     this.savedStep,
     required this.hasEquipmentBeenSeparated,
   });
@@ -112,6 +114,7 @@ class PlayerProfile {
     Object? selectedPetId = _unset,
     String? selectedClassId,
     List<String>? unlockedClassIds,
+    List<Item>? relics,
     Object? savedStep = _unset,
     bool? hasEquipmentBeenSeparated,
   }) => PlayerProfile(
@@ -145,6 +148,7 @@ class PlayerProfile {
         selectedPetId: identical(selectedPetId, _unset) ? this.selectedPetId : selectedPetId as String?,
         selectedClassId: selectedClassId ?? this.selectedClassId,
         unlockedClassIds: unlockedClassIds ?? this.unlockedClassIds,
+        relics: relics ?? this.relics,
         savedStep: identical(savedStep, _unset) ? this.savedStep : savedStep as int?,
         hasEquipmentBeenSeparated: hasEquipmentBeenSeparated ?? this.hasEquipmentBeenSeparated,
       );
@@ -180,6 +184,7 @@ class PlayerProfile {
         'selectedPetId': selectedPetId,
         'selectedClassId': selectedClassId,
         'unlockedClassIds': unlockedClassIds,
+        'relics': relics.map((r) => r.toJson()).toList(),
         'savedStep': savedStep,
         'hasEquipmentBeenSeparated': hasEquipmentBeenSeparated,
       };
@@ -217,6 +222,7 @@ class PlayerProfile {
         selectedPetId: json['selectedPetId'] as String?,
         selectedClassId: json['selectedClassId'] as String? ?? 'survivor',
         unlockedClassIds: (json['unlockedClassIds'] as List<dynamic>?)?.cast<String>() ?? ['survivor'],
+        relics: (json['relics'] as List<dynamic>?)?.map((r) => Item.fromJson(r as Map<String, dynamic>)).toList() ?? [],
         savedStep: (json['savedStep'] as num?)?.toInt(),
         hasEquipmentBeenSeparated: json['hasEquipmentBeenSeparated'] as bool? ?? false,
       );
@@ -243,6 +249,7 @@ class PlayerProfile {
         speedMultiplier: 0.1,
         selectedClassId: 'survivor',
         unlockedClassIds: const ['survivor'],
+        relics: const [],
         savedStep: null,
         hasEquipmentBeenSeparated: true, // New profiles don't need reset
       );

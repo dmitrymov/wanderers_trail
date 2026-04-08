@@ -616,19 +616,23 @@ class GameState extends ChangeNotifier {
     final rarity = isEpic ? _rollRarityForEpic() : _rollRarityForRegular();
     Item it = Item.heroicDrop(rarity: rarity, idGen: () => _uuid.v4());
 
-    // Hard-Equip to permanent slot
+    // Add to collection
+    final newList = List<Item>.from(profile.relics)..add(it);
+    _profile = profile.copyWith(relics: newList);
+
+    // Auto-equip only if the current slot is empty
     switch (it.type) {
       case ItemType.weapon:
-        _profile = profile.copyWith(weapon: it);
+        if (profile.weapon == null) _profile = profile.copyWith(weapon: it);
         break;
       case ItemType.armor:
-        _profile = profile.copyWith(armor: it);
+        if (profile.armor == null) _profile = profile.copyWith(armor: it);
         break;
       case ItemType.ring:
-        _profile = profile.copyWith(ring: it);
+        if (profile.ring == null) _profile = profile.copyWith(ring: it);
         break;
       case ItemType.boots:
-        _profile = profile.copyWith(boots: it);
+        if (profile.boots == null) _profile = profile.copyWith(boots: it);
         break;
     }
 
@@ -693,6 +697,29 @@ class GameState extends ChangeNotifier {
         break;
       case ItemType.boots:
         _profile = profile.copyWith(journeyBoots: item);
+        break;
+    }
+    _invalidateStatsCache();
+    notifyListeners();
+    _persist();
+  }
+
+  // Swap an equipped permanent slot with a relic from the collection.
+  void equipRelic(Item relic) {
+    if (!profile.relics.any((r) => r.id == relic.id)) return;
+
+    switch (relic.type) {
+      case ItemType.weapon:
+        _profile = profile.copyWith(weapon: relic);
+        break;
+      case ItemType.armor:
+        _profile = profile.copyWith(armor: relic);
+        break;
+      case ItemType.ring:
+        _profile = profile.copyWith(ring: relic);
+        break;
+      case ItemType.boots:
+        _profile = profile.copyWith(boots: relic);
         break;
     }
     _invalidateStatsCache();
