@@ -487,12 +487,13 @@ class GameState extends ChangeNotifier {
   void endJourney({int? saveStep}) {
     // Save current progress
     _profile = profile.copyWith(
-      savedStep: saveStep,
+      savedStep: saveStep ?? profile.savedStep,
       journeyWeapon: null,
       journeyArmor: null,
       journeyRing: null,
       journeyBoots: null,
     );
+    _invalidateStatsCache();
     notifyListeners();
     _persist();
   }

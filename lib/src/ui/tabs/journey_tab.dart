@@ -1373,6 +1373,7 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
         actions: [
           FilledButton(
             onPressed: () {
+              gs.endJourney(saveStep: null); // Clear level progress as it is complete
               Navigator.pop(ctx);
               Navigator.pop(context); // Go back to hub
             },
@@ -1390,6 +1391,7 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
       builder: (_) => _DefeatDialog(
         step: _step,
         onConfirm: () {
+          context.read<GameState>().endJourney(); // Preserve existing checkpoint to allow restart
           Navigator.of(context).pop(); // close dialog
           Navigator.of(context).pop(); // leave battle page
         },
