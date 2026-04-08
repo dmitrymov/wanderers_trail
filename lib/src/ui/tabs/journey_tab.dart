@@ -15,8 +15,8 @@ import '../widgets/stat_bar.dart';
 import '../overlay/overlay_service.dart';
 import 'character_tab.dart';
 
-class BattleTab extends StatelessWidget {
-  const BattleTab({super.key});
+class JourneyTab extends StatelessWidget {
+  const JourneyTab({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -30,63 +30,36 @@ class BattleTab extends StatelessWidget {
       final choice = await showDialog<_StartChoice>(
         context: context,
         builder: (ctx) {
-          return AlertDialog(
-            title: const Text('Start journey'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (canContinue)
-                  Text(
-                    'Continue from step ${gs.profile.savedStep} (equipment kept).',
-                  ),
-                if (resumeStep >= 50)
-                  Text(
-                    'Resume checkpoint: step $resumeStep (equipment kept).',
-                  ),
-                const Text('New run: step 0 (equipment reset).'),
-              ],
-            ),
-            actions: [
-              if (canContinue)
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(_StartChoice.continueRun),
-                  child: const Text('Continue'),
-                ),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(_StartChoice.newRun),
-                child: const Text('New run'),
-              ),
-              if (resumeStep >= 50)
-                FilledButton(
-                  onPressed: () => Navigator.of(ctx).pop(_StartChoice.resume),
-                  child: Text('Resume $resumeStep'),
-                ),
-            ],
-          );
+          return _StartRunDialog(gs: gs);
         },
       );
 
       if (choice == null || !context.mounted) return;
-      if (choice == _StartChoice.newRun) {
+      
+      if (choice.type == _StartChoiceType.newRun) {
+        gs.setIsEndlessMode(choice.isEndless);
         gs.resetForNewRun();
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => const ActiveBattlePage(initialStep: 0),
+            builder: (_) => ActiveJourneyPage(
+              initialStep: 0, 
+              level: choice.level,
+            ),
           ),
         );
-      } else if (choice == _StartChoice.resume) {
+      } else if (choice.type == _StartChoiceType.resume) {
+        gs.setIsEndlessMode(false); // checkpoints only for levels? Or keep current
         gs.prepareForCheckpointRun();
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => ActiveBattlePage(initialStep: resumeStep),
+            builder: (_) => ActiveJourneyPage(initialStep: resumeStep),
           ),
         );
-      } else if (choice == _StartChoice.continueRun) {
+      } else if (choice.type == _StartChoiceType.continueRun) {
         final step = gs.profile.savedStep ?? 0;
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => ActiveBattlePage(initialStep: step),
+            builder: (_) => ActiveJourneyPage(initialStep: step),
           ),
         );
       }
@@ -297,17 +270,127 @@ class _HubStatChip extends StatelessWidget {
   }
 }
 
-enum _StartChoice { newRun, resume, continueRun }
+enum _StartChoiceType { newRun, resume, continueRun }
 
-class ActiveBattlePage extends StatefulWidget {
-  const ActiveBattlePage({super.key, this.initialStep = 0});
-  final int initialStep;
-
-  @override
-  State<ActiveBattlePage> createState() => _ActiveBattlePageState();
+class _StartChoice {
+  final _StartChoiceType type;
+  final bool isEndless;
+  final int? level;
+  _StartChoice({required this.type, this.isEndless = false, this.level});
 }
 
-class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProviderStateMixin {
+class _StartRunDialog extends StatefulWidget {
+  final GameState gs;
+  const _StartRunDialog({required this.gs});
+
+  @override
+  State<_StartRunDialog> createState() => _StartRunDialogState();
+}
+
+class _StartRunDialogState extends State<_StartRunDialog> {
+  bool _isEndless = false;
+  int _selectedLevel = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedLevel = widget.gs.profile.highestUnlockedLevel;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final gs = widget.gs;
+    final canContinue = (gs.profile.savedStep ?? 0) > 0;
+    final resumeStep = (gs.profile.highScore ~/ 50) * 50;
+
+    return AlertDialog(
+      title: const Text('Start Journey'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (canContinue)
+              _ChoiceTile(
+                title: 'Continue',
+                subtitle: 'Step ${gs.profile.savedStep}',
+                onTap: () => Navigator.pop(context, _StartChoice(type: _StartChoiceType.continueRun)),
+              ),
+            if (resumeStep >= 50)
+              _ChoiceTile(
+                title: 'Resume Checkpoint',
+                subtitle: 'Step $resumeStep',
+                onTap: () => Navigator.pop(context, _StartChoice(type: _StartChoiceType.resume)),
+              ),
+            const Divider(),
+            SwitchListTile(
+              title: const Text('Endless Mode', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Classic mode with gifts'),
+              value: _isEndless,
+              onChanged: (v) => setState(() => _isEndless = v),
+            ),
+            if (!_isEndless) ...[
+              const SizedBox(height: 8),
+              const Text('Select Level:', style: TextStyle(fontSize: 12, color: Colors.black45)),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 8,
+                children: List.generate(gs.profile.highestUnlockedLevel, (i) {
+                  final lvl = i + 1;
+                  final isSelected = _selectedLevel == lvl;
+                  return ChoiceChip(
+                    label: Text('Lvl $lvl'),
+                    selected: isSelected,
+                    onSelected: (v) => setState(() => _selectedLevel = lvl),
+                  );
+                }),
+              ),
+            ],
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.pop(context, _StartChoice(
+                  type: _StartChoiceType.newRun,
+                  isEndless: _isEndless,
+                  level: _isEndless ? null : _selectedLevel,
+                )),
+                child: const Text('Begin New Run'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChoiceTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  const _ChoiceTile({required this.title, required this.subtitle, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text(subtitle),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: onTap,
+    );
+  }
+}
+
+class ActiveJourneyPage extends StatefulWidget {
+  const ActiveJourneyPage({super.key, this.initialStep = 0, this.level});
+  final int initialStep;
+  final int? level;
+
+  @override
+  State<ActiveJourneyPage> createState() => _ActiveJourneyPageState();
+}
+
+class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProviderStateMixin {
   bool _leaveDialogOpen = false;
 
   void _requestLeave() {
@@ -329,7 +412,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
       context: context,
       builder:
           (ctx) => AlertDialog(
-            title: const Text('Leave battle?'),
+            title: const Text('Leave journey?'),
             content: const Text(
               'Leaving will save your progress. You can continue from your last save point. Equipment will be preserved.',
             ),
@@ -347,7 +430,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
     );
     _leaveDialogOpen = false;
     if (confirm == true) {
-      gs2.leaveBattleAndResetEquipment(saveStep: _step);
+      gs2.endJourney(saveStep: _step);
       gs2.setCombatActive(false);
       _stopCombat();
       if (mounted) Navigator.of(context).pop();
@@ -634,8 +717,20 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
       _lastWorldOffset = _worldOffset;
       _worldController.forward(from: 0.0);
       
+      final level = widget.level;
+      final maxStages = level != null ? level * 10 : null;
+
+      // Endless gifts check
+      if (gs.isEndlessMode) {
+        gs.processEndlessStep(_step);
+      }
+
       // 35% chance to encounter a monster.
-      if (_rnd.nextDouble() < 0.35) {
+      if (maxStages != null && _step == maxStages) {
+        // BOSS TIME
+        _monster = Monster.bossForLevel(gs, level, _rnd);
+        _startCombat(gs);
+      } else if (_rnd.nextDouble() < 0.35) {
         _monster = Monster.randomForStep(gs, _step, _rnd);
         _startCombat(gs);
       } else if (_rnd.nextDouble() < 0.10) {
@@ -1032,7 +1127,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
           }
           _onMonsterAttackResolved(monsterSwingDamage);
           if (gs.profile.health <= 0) {
-            gs.setCombatActive(false);
+            // gs.setCombatActive(false);
             _stopCombat();
             _handleDefeat();
             return;
@@ -1201,33 +1296,91 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
   }
 
   void _onMonsterDefeated(GameState gs) {
+    if (_monster == null) return;
+    _stopCombat();
+    final mName = _monster!.name;
+    final isBoss = _monster!.isBoss;
+    final level = widget.level;
+
     final coins = _coinsForKill();
     if (coins > 0) {
       gs.addCoins(coins);
-      OverlayService.showToast(
-        '+$coins coins',
-      ); //TODO: now its displayed in middle of item drop popup
     }
+
     final drop = gs.maybeDrop(runScore: _step);
+    
+    if (isBoss) {
+      // Boss rewards: Diamonds + Key + Progress
+      gs.rewardBossDefeat(level!);
+      _showBossVictoryDialog(gs, level, drop);
+    } else {
+      if (drop != null && mounted) {
+        ItemDropPopup.show(context, drop, onEquip: () {
+          gs.equip(drop);
+          _log('Equipped ${drop.name}.', Colors.blueGrey);
+        });
+      } else {
+        final msg = gs.applyTemporaryBlessing();
+        if (mounted) {
+          OverlayService.showToast(msg);
+        }
+      }
+    }
+
+    _log('Defeated $mName!', Colors.green);
     setState(() {
       _monster = null;
       _monsterDying = false;
     });
-    gs.setCombatActive(false);
-    _stopCombat();
-    if (drop != null && mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder:
-            (_) => ItemDropPopup(item: drop, onEquip: () => gs.equip(drop)),
-      );
-    } else {
-      final msg = gs.applyTemporaryBlessing();
-      if (mounted) {
-        OverlayService.showToast(msg);
-      }
-    }
+    
+    _resetExchangeRoundTracking();
+  }
+
+  void _showBossVictoryDialog(GameState gs, int level, Item? drop) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('EXPEDITION SUCCESS!'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.emoji_events_rounded, size: 72, color: Colors.amber),
+            const SizedBox(height: 16),
+            Text('Level $level Conquered', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text('You have defeated the boss and earned your rewards!'),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.diamond_rounded, color: Colors.cyanAccent),
+                Text(' +${50 + level * 10}'),
+                const SizedBox(width: 16),
+                const Icon(Icons.vpn_key_rounded, color: Colors.amberAccent),
+                const Text(' +1 Key'),
+              ],
+            ),
+            if (drop != null) ...[
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              const Text('Bonus Drop:', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(drop.name, style: TextStyle(color: drop.rarityColor)),
+            ],
+          ],
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pop(context); // Go back to hub
+            },
+            child: const Text('Return to Hub'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _handleDefeat() {
@@ -1736,7 +1889,7 @@ class _ActiveBattlePageState extends State<ActiveBattlePage> with TickerProvider
                             },
                           ),
                           Expanded(
-                            child: _BattleLogList(
+                            child: _JourneyLogList(
                               logs: _logs,
                               controller: _logScrollController,
                             ),
@@ -2031,13 +2184,13 @@ class _InventoryBar extends StatelessWidget {
 
     return Row(
       children: [
-        cell('Weapon', p.weapon),
+        cell('Weapon', p.journeyWeapon ?? p.weapon),
         const SizedBox(width: 8),
-        cell('Armor', p.armor),
+        cell('Armor', p.journeyArmor ?? p.armor),
         const SizedBox(width: 8),
-        cell('Ring', p.ring),
+        cell('Ring', p.journeyRing ?? p.ring),
         const SizedBox(width: 8),
-        cell('Boots', p.boots),
+        cell('Boots', p.journeyBoots ?? p.boots),
       ],
     );
   }
@@ -2399,6 +2552,7 @@ class Monster {
   final double accuracy; // 0..1 base accuracy
   final double evasion; // 0..1 chance to avoid being hit
   final String imageAsset; // enemy image asset path
+  final bool isBoss;
   const Monster({
     required this.name,
     required this.type,
@@ -2410,6 +2564,7 @@ class Monster {
     required this.accuracy,
     required this.evasion,
     required this.imageAsset,
+    this.isBoss = false,
   });
 
   Monster hit(int damage) => Monster(
@@ -2423,6 +2578,7 @@ class Monster {
     accuracy: accuracy,
     evasion: evasion,
     imageAsset: imageAsset,
+    isBoss: isBoss,
   );
 
   static Monster randomForStep(GameState gs, int step, Random rnd) {
@@ -2546,6 +2702,28 @@ class Monster {
       accuracy: finalAccuracy,
       evasion: finalEvasion,
       imageAsset: image,
+      isBoss: false,
+    );
+  }
+
+  static Monster bossForLevel(GameState gs, int? level, Random rnd) {
+    if (level == null) return randomForStep(gs, 100, rnd);
+    // bosses are much tougher
+    final scale = 1.0 + (level * 0.5);
+    final base = randomForStep(gs, level * 10, rnd);
+    
+    return Monster(
+      name: 'BOSS: ${base.name}',
+      type: base.type,
+      tier: base.tier + 5,
+      hp: (base.maxHp * 5 * scale).toInt(),
+      maxHp: (base.maxHp * 5 * scale).toInt(),
+      attackMs: (base.attackMs * 0.8).round().clamp(300, 2000),
+      defense: (base.defense * 2 * scale).toInt(),
+      accuracy: (base.accuracy + 0.1).clamp(0, 0.99),
+      evasion: (base.evasion + 0.05).clamp(0, 0.8),
+      imageAsset: base.imageAsset,
+      isBoss: true,
     );
   }
 }
@@ -2557,10 +2735,10 @@ class _LogEntry {
   const _LogEntry(this.text, this.color, {this.icon});
 }
 
-class _BattleLogList extends StatelessWidget {
+class _JourneyLogList extends StatelessWidget {
   final List<_LogEntry> logs;
   final ScrollController controller;
-  const _BattleLogList({required this.logs, required this.controller});
+  const _JourneyLogList({required this.logs, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -2600,7 +2778,7 @@ class _BattleLogList extends StatelessWidget {
                 const Icon(Icons.article_outlined, size: 13, color: Colors.white38),
                 const SizedBox(width: 6),
                 const Text(
-                  'BATTLE LOG',
+                  'JOURNEY LOG',
                   style: TextStyle(
                     color: Colors.white38,
                     fontSize: 10,

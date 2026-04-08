@@ -11,6 +11,7 @@ import '../core/stats.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
+import '../ui/overlay/overlay_service.dart';
 
 enum PermanentUpgrade { health, stamina, attack, defense, speed }
 
@@ -33,6 +34,14 @@ class GameState extends ChangeNotifier {
   // Asset readiness flag
   bool _assetsReady = false;
   bool get assetsReady => _assetsReady;
+
+  bool _isEndlessMode = false;
+  bool get isEndlessMode => _isEndlessMode;
+  void setIsEndlessMode(bool val) {
+    _isEndlessMode = val;
+    _invalidateStatsCache();
+    notifyListeners();
+  }
 
   // Ephemeral combat state for tuning regen
   bool _inCombat = false;
@@ -237,6 +246,8 @@ class GameState extends ChangeNotifier {
     coins: 0,
     diamonds: 0,
     highScore: 0,
+    highestUnlockedLevel: 1,
+    equipmentKeys: 0,
     maxHealth: 100,
     maxStamina: 100,
     healthUpgrades: 0,
@@ -250,6 +261,7 @@ class GameState extends ChangeNotifier {
     speedMultiplier: 0.1,
     selectedClassId: 'survivor',
     unlockedClassIds: ['survivor'],
+    hasEquipmentBeenSeparated: true,
   );
 
   // Upgrade config
@@ -292,6 +304,15 @@ class GameState extends ChangeNotifier {
   Future<void> init() async {
     // For now use a fixed local user id; later replace with auth uid.
     _profile = await repo.loadProfile(userId: 'local');
+    
+    // One-time migration: Clear legacy journey items from permanent slots as requested.
+    // This only runs once per user to avoid clobbering new Shop purchases.
+    if (!profile.hasEquipmentBeenSeparated) {
+      clearPermanentEquipment();
+      _profile = profile.copyWith(hasEquipmentBeenSeparated: true);
+      _persist();
+    }
+    
     await _loadAssetManifest();
     _startRegen();
     notifyListeners();
@@ -378,13 +399,16 @@ class GameState extends ChangeNotifier {
       staminaUpgrades: 0,
       speedUpgrades: 0,
       speedMultiplier: profile.speedMultiplier.clamp(0.1, 1.0),
-      weapon: null, // cleared explicitly via sentinel-aware copyWith
-      armor: null,
-      ring: null,
-      boots: null,
+      journeyWeapon: null, // explicitly cleared for the new run
+      journeyArmor: null,
+      journeyRing: null,
+      journeyBoots: null,
       savedStep: null,
       coins: 0,
     );
+    // If endless mode acts like the old "classic" mode, we might want to preserve 
+    // the fact that items are lost or kept. For now, since "Hero Equipment" is permanent,
+    // we do NOT clear standard weapon/armor/ring/boots.
     _invalidateStatsCache();
     notifyListeners();
     _persist();
@@ -415,17 +439,60 @@ class GameState extends ChangeNotifier {
     _persist();
   }
 
+  void addKeys(int amount) {
+    _profile = profile.copyWith(equipmentKeys: profile.equipmentKeys + amount);
+    notifyListeners();
+    _persist();
+  }
+
+  /// Triggered after defeating a boss
+  void rewardBossDefeat(int level) {
+    // Reward: Diamonds + 1 Key
+    addDiamonds(50 + (level * 10)); 
+    addKeys(1);
+    
+    // Unlock next level if applicable
+    if (level >= profile.highestUnlockedLevel) {
+      _profile = profile.copyWith(highestUnlockedLevel: level + 1);
+    }
+    
+    notifyListeners();
+    _persist();
+  }
+
+  /// Reward logic for endless mode steps
+  void processEndlessStep(int step) {
+    if (!_isEndlessMode) return;
+    
+    // Every 10 levels: Money gift (Flat 100 for now)
+    if (step > 0 && step % 10 == 0) {
+      addCoins(100);
+      OverlayService.showToast('Endless Reward: +100 Coins!');
+    }
+    
+    // Every 30 levels: Diamonds gift (Flat 10 for now)
+    if (step > 0 && step % 30 == 0) {
+      addDiamonds(10);
+      OverlayService.showToast('Endless Reward: +10 Diamonds!');
+    }
+  }
+
   void clearRunProgress() {
     _profile = profile.copyWith(savedStep: null);
     notifyListeners();
     _persist();
   }
 
-  // Leave battle: save progress at given step and preserve equipment.
-  // Equipment should only be reset on a New Run.
-  void leaveBattleAndResetEquipment({required int saveStep}) {
+  // End journey: save progress if needed and clear temporary items.
+  void endJourney({int? saveStep}) {
     // Save current progress
-    _profile = profile.copyWith(savedStep: saveStep);
+    _profile = profile.copyWith(
+      savedStep: saveStep,
+      journeyWeapon: null,
+      journeyArmor: null,
+      journeyRing: null,
+      journeyBoots: null,
+    );
     notifyListeners();
     _persist();
   }
@@ -528,20 +595,103 @@ class GameState extends ChangeNotifier {
     _persist();
   }
 
-  // Equipment
-  void equip(Item item) {
-    switch (item.type) {
+  /// Open an equipment chest from the shop.
+  /// Deducts cost (Diamonds or Keys) and yields a permanent item.
+  Item? openChest(String chestType, {bool useKey = false}) {
+    final isEpic = chestType == 'epic';
+    final diamondCost = isEpic ? 150 : 50;
+
+    if (useKey) {
+      if (profile.equipmentKeys < 1) return null;
+      _profile = profile.copyWith(equipmentKeys: profile.equipmentKeys - 1);
+    } else {
+      if (profile.diamonds < diamondCost) return null;
+      _profile = profile.copyWith(diamonds: profile.diamonds - diamondCost);
+    }
+
+    // Roll item logic:
+    // Regular chest: Score 40 (Uncommon/Rare/Legendary bias)
+    // Epic chest: Score 120 (Rare/Legendary/Mystic bias)
+    final rarity = isEpic ? _rollRarityForEpic() : _rollRarityForRegular();
+    Item it = Item.heroicDrop(rarity: rarity, idGen: () => _uuid.v4());
+
+    // Hard-Equip to permanent slot
+    switch (it.type) {
       case ItemType.weapon:
-        _profile = profile.copyWith(weapon: item);
+        _profile = profile.copyWith(weapon: it);
         break;
       case ItemType.armor:
-        _profile = profile.copyWith(armor: item);
+        _profile = profile.copyWith(armor: it);
         break;
       case ItemType.ring:
-        _profile = profile.copyWith(ring: item);
+        _profile = profile.copyWith(ring: it);
         break;
       case ItemType.boots:
-        _profile = profile.copyWith(boots: item);
+        _profile = profile.copyWith(boots: it);
+        break;
+    }
+
+    _invalidateStatsCache();
+    notifyListeners();
+    _persist();
+    return it;
+  }
+
+  void buyCurrencyPack(String type, int amount) {
+    if (type == 'diamonds') {
+      _profile = profile.copyWith(diamonds: profile.diamonds + amount);
+    } else {
+      _profile = profile.copyWith(coins: profile.coins + amount);
+    }
+    notifyListeners();
+    _persist();
+  }
+
+  ItemRarity _rollRarityForRegular() {
+    final rnd = Random();
+    final roll = rnd.nextInt(100);
+    if (roll < 50) return ItemRarity.normal;
+    if (roll < 80) return ItemRarity.uncommon;
+    if (roll < 95) return ItemRarity.rare;
+    return ItemRarity.legendary;
+  }
+
+  ItemRarity _rollRarityForEpic() {
+    final rnd = Random();
+    final roll = rnd.nextInt(100);
+    if (roll < 40) return ItemRarity.rare;
+    if (roll < 85) return ItemRarity.legendary;
+    return ItemRarity.mystic;
+  }
+
+  void clearPermanentEquipment() {
+    _profile = profile.copyWith(
+      weapon: null,
+      armor: null,
+      ring: null,
+      boots: null,
+    );
+    _invalidateStatsCache();
+    notifyListeners();
+    _persist();
+  }
+
+  // Equipment found in journey (wild drops)
+  void equip(Item item) {
+    // Finding items during a run (wild drops) ALWAYS goes to journey slots.
+    // Permanent slots are only modified via Shop Chests or external events.
+    switch (item.type) {
+      case ItemType.weapon:
+        _profile = profile.copyWith(journeyWeapon: item);
+        break;
+      case ItemType.armor:
+        _profile = profile.copyWith(journeyArmor: item);
+        break;
+      case ItemType.ring:
+        _profile = profile.copyWith(journeyRing: item);
+        break;
+      case ItemType.boots:
+        _profile = profile.copyWith(journeyBoots: item);
         break;
     }
     _invalidateStatsCache();
@@ -782,10 +932,16 @@ class GameState extends ChangeNotifier {
   }
 
   StatsSummary get statsSummary {
-    final w = profile.weapon?.id;
-    final a = profile.armor?.id;
-    final r = profile.ring?.id;
-    final b = profile.boots?.id;
+    // If a journey item exists, it overrides the home (permanent) item for this run.
+    final curW = profile.journeyWeapon ?? profile.weapon;
+    final curA = profile.journeyArmor ?? profile.armor;
+    final curR = profile.journeyRing ?? profile.ring;
+    final curB = profile.journeyBoots ?? profile.boots;
+
+    final w = curW?.id;
+    final a = curA?.id;
+    final r = curR?.id;
+    final b = curB?.id;
     final petId = profile.selectedPetId;
     final dirty =
         _statsCache == null ||
@@ -798,10 +954,10 @@ class GameState extends ChangeNotifier {
         _cachePermDefenseLevel != permDefenseLevel;
     if (dirty) {
       final base = StatsSummary.fromItems(
-        weapon: profile.weapon,
-        armor: profile.armor,
-        ring: profile.ring,
-        boots: profile.boots,
+        weapon: curW,
+        armor: curA,
+        ring: curR,
+        boots: curB,
       );
       final withPerm = StatsSummary.withBonuses(
         base,

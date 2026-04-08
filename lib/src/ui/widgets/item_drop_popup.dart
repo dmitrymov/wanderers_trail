@@ -9,6 +9,14 @@ class ItemDropPopup extends StatelessWidget {
   final VoidCallback onEquip;
   const ItemDropPopup({super.key, required this.item, required this.onEquip});
 
+  static void show(BuildContext context, Item item, {required VoidCallback onEquip}) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => ItemDropPopup(item: item, onEquip: onEquip),
+    );
+  }
+
   Color _rarityColor(ItemRarity r) {
     switch (r) {
       case ItemRarity.normal:
@@ -164,7 +172,7 @@ class ItemDropPopup extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text('Type: ${item.type.name}'),
+          Text('Type: ${item.type.toString().split('.').last.toUpperCase()}'),
           const SizedBox(height: 8),
           Text(_baseLine(item)),
           if (statEntries.isNotEmpty) ...[

@@ -14,7 +14,7 @@ import 'src/data/repositories/game_repository.dart';
 import 'src/data/repositories/local_game_repository.dart';
 import 'src/data/repositories/firestore_game_repository.dart';
 import 'src/state/game_state.dart';
-import 'src/ui/tabs/battle_tab.dart';
+import 'src/ui/tabs/journey_tab.dart';
 import 'src/ui/tabs/character_tab.dart';
 import 'src/ui/tabs/pet_tab.dart';
 import 'src/ui/tabs/shop_tab.dart';
@@ -77,7 +77,7 @@ class _HomeScaffoldState extends State<HomeScaffold> {
   final _pages = const [
     ShopTab(),
     CharacterTab(),
-    BattleTab(),
+    JourneyTab(),
     PetTab(),
   ];
 
@@ -136,9 +136,9 @@ class _HomeScaffoldState extends State<HomeScaffold> {
                 label: 'Hero',
               ),
               NavigationDestination(
-                icon: Icon(Icons.sports_esports_outlined),
-                selectedIcon: Icon(Icons.sports_esports),
-                label: 'Battle',
+                icon: Icon(Icons.explore_outlined),
+                selectedIcon: Icon(Icons.explore),
+                label: 'Journey',
               ),
               NavigationDestination(
                 icon: Icon(Icons.pets_outlined),

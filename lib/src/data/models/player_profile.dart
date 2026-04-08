@@ -8,6 +8,8 @@ class PlayerProfile {
   final int coins;
   final int diamonds; // premium currency
   final int highScore;
+  final int highestUnlockedLevel;
+  final int equipmentKeys;
 
   // Run-limited maximums (reset on New Run / Resume Checkpoint)
   final int maxHealth;
@@ -31,10 +33,16 @@ class PlayerProfile {
   final Item? ring;
   final Item? boots;
 
+  final Item? journeyWeapon;
+  final Item? journeyArmor;
+  final Item? journeyRing;
+  final Item? journeyBoots;
+
   final String? selectedPetId;
   final String selectedClassId;
   final List<String> unlockedClassIds;
   final int? savedStep; // last saved run step for Continue
+  final bool hasEquipmentBeenSeparated; // One-time migration flag
 
   const PlayerProfile({
     required this.userId,
@@ -43,6 +51,8 @@ class PlayerProfile {
     required this.coins,
     required this.diamonds,
     required this.highScore,
+    required this.highestUnlockedLevel,
+    required this.equipmentKeys,
     required this.maxHealth,
     required this.maxStamina,
     required this.healthUpgrades,
@@ -58,10 +68,15 @@ class PlayerProfile {
     this.armor,
     this.ring,
     this.boots,
+    this.journeyWeapon,
+    this.journeyArmor,
+    this.journeyRing,
+    this.journeyBoots,
     this.selectedPetId,
     required this.selectedClassId,
     required this.unlockedClassIds,
     this.savedStep,
+    required this.hasEquipmentBeenSeparated,
   });
 
   static const Object _unset = Object();
@@ -73,6 +88,8 @@ class PlayerProfile {
     int? coins,
     int? diamonds,
     int? highScore,
+    int? highestUnlockedLevel,
+    int? equipmentKeys,
     int? maxHealth,
     int? maxStamina,
     int? healthUpgrades,
@@ -88,10 +105,15 @@ class PlayerProfile {
     Object? armor = _unset,
     Object? ring = _unset,
     Object? boots = _unset,
+    Object? journeyWeapon = _unset,
+    Object? journeyArmor = _unset,
+    Object? journeyRing = _unset,
+    Object? journeyBoots = _unset,
     Object? selectedPetId = _unset,
     String? selectedClassId,
     List<String>? unlockedClassIds,
     Object? savedStep = _unset,
+    bool? hasEquipmentBeenSeparated,
   }) => PlayerProfile(
         userId: userId ?? this.userId,
         health: health ?? this.health,
@@ -99,6 +121,8 @@ class PlayerProfile {
         coins: coins ?? this.coins,
         diamonds: diamonds ?? this.diamonds,
         highScore: highScore ?? this.highScore,
+        highestUnlockedLevel: highestUnlockedLevel ?? this.highestUnlockedLevel,
+        equipmentKeys: equipmentKeys ?? this.equipmentKeys,
         maxHealth: maxHealth ?? this.maxHealth,
         maxStamina: maxStamina ?? this.maxStamina,
         healthUpgrades: healthUpgrades ?? this.healthUpgrades,
@@ -114,10 +138,15 @@ class PlayerProfile {
         armor: identical(armor, _unset) ? this.armor : armor as Item?,
         ring: identical(ring, _unset) ? this.ring : ring as Item?,
         boots: identical(boots, _unset) ? this.boots : boots as Item?,
+        journeyWeapon: identical(journeyWeapon, _unset) ? this.journeyWeapon : journeyWeapon as Item?,
+        journeyArmor: identical(journeyArmor, _unset) ? this.journeyArmor : journeyArmor as Item?,
+        journeyRing: identical(journeyRing, _unset) ? this.journeyRing : journeyRing as Item?,
+        journeyBoots: identical(journeyBoots, _unset) ? this.journeyBoots : journeyBoots as Item?,
         selectedPetId: identical(selectedPetId, _unset) ? this.selectedPetId : selectedPetId as String?,
         selectedClassId: selectedClassId ?? this.selectedClassId,
         unlockedClassIds: unlockedClassIds ?? this.unlockedClassIds,
         savedStep: identical(savedStep, _unset) ? this.savedStep : savedStep as int?,
+        hasEquipmentBeenSeparated: hasEquipmentBeenSeparated ?? this.hasEquipmentBeenSeparated,
       );
 
   Map<String, dynamic> toJson() => {
@@ -127,6 +156,8 @@ class PlayerProfile {
         'coins': coins,
         'diamonds': diamonds,
         'highScore': highScore,
+        'highestUnlockedLevel': highestUnlockedLevel,
+        'equipmentKeys': equipmentKeys,
         'maxHealth': maxHealth,
         'maxStamina': maxStamina,
         'healthUpgrades': healthUpgrades,
@@ -142,10 +173,15 @@ class PlayerProfile {
         'armor': armor?.toJson(),
         'ring': ring?.toJson(),
         'boots': boots?.toJson(),
+        'journeyWeapon': journeyWeapon?.toJson(),
+        'journeyArmor': journeyArmor?.toJson(),
+        'journeyRing': journeyRing?.toJson(),
+        'journeyBoots': journeyBoots?.toJson(),
         'selectedPetId': selectedPetId,
         'selectedClassId': selectedClassId,
         'unlockedClassIds': unlockedClassIds,
         'savedStep': savedStep,
+        'hasEquipmentBeenSeparated': hasEquipmentBeenSeparated,
       };
 
   factory PlayerProfile.fromJson(Map<String, dynamic> json) => PlayerProfile(
@@ -155,6 +191,8 @@ class PlayerProfile {
         coins: (json['coins'] as num).toInt(),
         diamonds: (json['diamonds'] as num?)?.toInt() ?? 0,
         highScore: (json['highScore'] as num).toInt(),
+        highestUnlockedLevel: (json['highestUnlockedLevel'] as num?)?.toInt() ?? 1,
+        equipmentKeys: (json['equipmentKeys'] as num?)?.toInt() ?? 0,
         maxHealth: (json['maxHealth'] as num?)?.toInt() ?? (json['health'] as num).toInt(),
         maxStamina: (json['maxStamina'] as num?)?.toInt() ?? (json['stamina'] as num).toInt(),
         healthUpgrades: (json['healthUpgrades'] as num?)?.toInt() ?? 0,
@@ -171,10 +209,16 @@ class PlayerProfile {
         armor: json['armor'] == null ? null : Item.fromJson(json['armor'] as Map<String, dynamic>),
         ring: json['ring'] == null ? null : Item.fromJson(json['ring'] as Map<String, dynamic>),
         boots: json['boots'] == null ? null : Item.fromJson(json['boots'] as Map<String, dynamic>),
+        journeyWeapon:
+            json['journeyWeapon'] == null ? null : Item.fromJson(json['journeyWeapon'] as Map<String, dynamic>),
+        journeyArmor: json['journeyArmor'] == null ? null : Item.fromJson(json['journeyArmor'] as Map<String, dynamic>),
+        journeyRing: json['journeyRing'] == null ? null : Item.fromJson(json['journeyRing'] as Map<String, dynamic>),
+        journeyBoots: json['journeyBoots'] == null ? null : Item.fromJson(json['journeyBoots'] as Map<String, dynamic>),
         selectedPetId: json['selectedPetId'] as String?,
         selectedClassId: json['selectedClassId'] as String? ?? 'survivor',
         unlockedClassIds: (json['unlockedClassIds'] as List<dynamic>?)?.cast<String>() ?? ['survivor'],
         savedStep: (json['savedStep'] as num?)?.toInt(),
+        hasEquipmentBeenSeparated: json['hasEquipmentBeenSeparated'] as bool? ?? false,
       );
 
   static PlayerProfile defaults({required String userId}) => PlayerProfile(
@@ -184,6 +228,8 @@ class PlayerProfile {
         coins: 0,
         diamonds: 0,
         highScore: 0,
+        highestUnlockedLevel: 1,
+        equipmentKeys: 0,
         maxHealth: 100,
         maxStamina: 100,
         healthUpgrades: 0,
@@ -198,6 +244,7 @@ class PlayerProfile {
         selectedClassId: 'survivor',
         unlockedClassIds: const ['survivor'],
         savedStep: null,
+        hasEquipmentBeenSeparated: true, // New profiles don't need reset
       );
 
   HeroClass get heroClass => HeroClass.get(selectedClassId);

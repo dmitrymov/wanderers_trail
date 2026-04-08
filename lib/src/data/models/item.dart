@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:flutter/material.dart';
 
 enum ItemType { weapon, armor, ring, boots }
 
@@ -58,8 +59,28 @@ class Item {
     imageAsset: imageAsset ?? this.imageAsset,
   );
 
+  Color get rarityColor {
+    switch (rarity) {
+      case ItemRarity.normal:
+        return Color(0xFF9E9E9E); // Grey
+      case ItemRarity.uncommon:
+        return Color(0xFF4CAF50); // Green
+      case ItemRarity.rare:
+        return Color(0xFF2196F3); // Blue
+      case ItemRarity.legendary:
+        return Color(0xFFFFD700); // Gold
+      case ItemRarity.mystic:
+        return Color(0xFFFF5252); // Red
+    }
+  }
+
   String get effectiveAssetPath {
-    final t = type.name;
+    // Priority 0: Explicit full paths (e.g. from heroicDrop)
+    if (imageAsset != null && imageAsset!.startsWith('assets/')) {
+      return imageAsset!;
+    }
+
+    final t = type.toString().split('.').last;
     String folder;
     if (t == 'weapon') {
       folder = 'weapons';
@@ -77,9 +98,7 @@ class Item {
 
     // For weapons, if we don't have a specific imageAsset assigned at creation time,
     // or if the saved one is old, re-roll a valid path STABLY.
-    final cur = imageAsset;
     if (t == 'weapon') {
-      if (cur != null && cur.startsWith('assets/images/weapons/')) return cur;
       return _weaponImagePath(rarity, seededRnd);
     }
 
@@ -87,18 +106,17 @@ class Item {
     if (t == 'armor' && code == '4') return 'assets/images/armor/armor_41.png';
 
     // Everyone else uses Digit1 (e.g. boots_41.png, ring_01.png)
-    // We could add variant support here too using seededRnd if we had more files.
     return 'assets/images/$folder/${t}_${code}1.$ext';
   }
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'type': type.name,
+    'type': type.toString().split('.').last,
     'name': name,
     'power': power,
     'level': level,
-    'rarity': rarity.name,
-    'stats': stats.map((k, v) => MapEntry(k.name, v)),
+    'rarity': rarity.toString().split('.').last,
+    'stats': stats.map((k, v) => MapEntry(k.toString().split('.').last, v)),
     // No longer saving 'image' here as it's computed dynamically
   };
 
@@ -109,7 +127,7 @@ class Item {
     if (statsJson != null) {
       for (final e in statsJson.entries) {
         final t = ItemStatType.values.firstWhere(
-          (x) => x.name == e.key,
+          (x) => x.toString().split('.').last == e.key,
           orElse: () => ItemStatType.attack,
         );
         stats[t] = (e.value as num).toDouble();
@@ -118,7 +136,7 @@ class Item {
     return Item(
       id: json['id'] as String,
       type: ItemType.values.firstWhere(
-        (e) => e.name == json['type'],
+        (e) => e.toString().split('.').last == json['type'],
         orElse: () => ItemType.weapon,
       ),
       name: json['name'] as String,
@@ -128,7 +146,7 @@ class Item {
           rarityStr == null
               ? ItemRarity.normal
               : ItemRarity.values.firstWhere(
-                (r) => r.name == rarityStr,
+                (r) => r.toString().split('.').last == rarityStr,
                 orElse: () => ItemRarity.normal,
               ),
       stats: stats,
@@ -246,6 +264,89 @@ class Item {
       type: type,
       name: name,
       power: basePower,
+      level: level,
+      rarity: rarity,
+      stats: stats,
+      imageAsset: image,
+    );
+  }
+
+  /// Generate a permanent "Heroic Relic" for the Shop chests.
+  /// These are visually distinct from Journey gear.
+  static Item heroicDrop({
+    required ItemRarity rarity,
+    required String Function() idGen,
+  }) {
+    final rnd = Random();
+    final typeRoll = rnd.nextInt(4);
+    final type = ItemType.values[typeRoll];
+    
+    // Heroic items start at a higher baseline baseline
+    // Level is fixed at 1 for new purchases, but rarity provides core power.
+    final level = 1;
+    final powerBoost = switch (rarity) {
+      ItemRarity.normal => 5,
+      ItemRarity.uncommon => 8,
+      ItemRarity.rare => 12,
+      ItemRarity.legendary => 20,
+      ItemRarity.mystic => 35,
+    };
+
+    String name;
+    String image;
+    int power;
+
+    switch (type) {
+      case ItemType.weapon:
+        power = 10 + powerBoost;
+        final weapons = [
+          ('Celestial Blade', 'celestial_blade.png'),
+          ('Void Shard', 'void_shard.png'),
+          ('Archon Staff', 'archon_staff.png'),
+          ('Dragon Smasher', 'dragon_smasher.png'),
+        ];
+        final w = weapons[rnd.nextInt(weapons.length)];
+        name = w.$1;
+        image = 'assets/images/relics/${w.$2}';
+        break;
+      case ItemType.armor:
+        power = 8 + powerBoost;
+        final armors = [
+          ('Paladin Soul-Plate', 'soulplate.png'),
+          ('Elder\'s Weave', 'elders_weave.png'),
+        ];
+        final a = armors[rnd.nextInt(armors.length)];
+        name = a.$1;
+        image = 'assets/images/relics/${a.$2}';
+        break;
+      case ItemType.ring:
+        power = 5 + powerBoost;
+        name = 'Eye of Ra';
+        image = 'assets/images/relics/eye_of_ra.png';
+        break;
+      case ItemType.boots:
+        power = 6 + powerBoost;
+        name = 'Hermes\' Swift-Steps';
+        image = 'assets/images/relics/hermes_steps.png';
+        break;
+    }
+
+    // Add high-end heroic prefixes
+    final prefix = switch (rarity) {
+      ItemRarity.normal => 'Imperial ',
+      ItemRarity.uncommon => 'Ancient ',
+      ItemRarity.rare => 'Sovereign ',
+      ItemRarity.legendary => 'Eternal ',
+      ItemRarity.mystic => 'Ancestral ',
+    };
+
+    final stats = _rollAdditionalStats(type, rarity, 5, rnd); // Roll as if level 5 for better stats
+
+    return Item(
+      id: idGen(),
+      type: type,
+      name: '$prefix$name',
+      power: power,
       level: level,
       rarity: rarity,
       stats: stats,
