@@ -241,24 +241,31 @@ class _JourneyTabState extends State<JourneyTab> {
                 const SizedBox(height: 16),
                 SizedBox(
                   height: 240,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: JourneyLevelConfig.allLevels.length,
-                    itemBuilder: (context, index) {
-                      final level = JourneyLevelConfig.allLevels[index];
-                      final isUnlocked = level.levelId <= gs.profile.highestUnlockedLevel;
-                      
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 16),
-                        child: _LevelCard(
-                          level: level,
-                          isUnlocked: isUnlocked,
-                          isEndless: _isEndless,
-                          onTap: isUnlocked ? () => _startLevel(gs, level.levelId) : null,
-                        ),
-                      );
-                    },
-                  ),
+                  child: Builder(builder: (context) {
+                    // Show all curated levels + one more unlockable beyond the player's current max
+                    final highestUnlocked = gs.profile.highestUnlockedLevel;
+                    final displayCount = (highestUnlocked + 1)
+                        .clamp(JourneyLevelConfig.allLevels.length, highestUnlocked + 1);
+                    return ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: displayCount,
+                      itemBuilder: (context, index) {
+                        final levelId = index + 1;
+                        final level = JourneyLevelConfig.getLevel(levelId);
+                        final isUnlocked = levelId <= highestUnlocked;
+
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 16),
+                          child: _LevelCard(
+                            level: level,
+                            isUnlocked: isUnlocked,
+                            isEndless: _isEndless,
+                            onTap: isUnlocked ? () => _startLevel(gs, level.levelId) : null,
+                          ),
+                        );
+                      },
+                    );
+                  }),
                 ),
               ],
             ),
@@ -301,14 +308,25 @@ class _LevelCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            // Preview Image
+            // Preview Image (with optional colour tint for level differentiation)
             Positioned.fill(
-              child: Image.asset(
-                level.backgroundAsset,
-                fit: BoxFit.cover,
-                color: isUnlocked ? null : Colors.grey,
-                colorBlendMode: isUnlocked ? null : BlendMode.saturation,
-              ),
+              child: level.backgroundTint != null && isUnlocked
+                  ? ColorFiltered(
+                      colorFilter: ColorFilter.mode(
+                        level.backgroundTint!,
+                        BlendMode.srcATop,
+                      ),
+                      child: Image.asset(
+                        level.backgroundAsset,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : Image.asset(
+                      level.backgroundAsset,
+                      fit: BoxFit.cover,
+                      color: isUnlocked ? null : Colors.grey,
+                      colorBlendMode: isUnlocked ? null : BlendMode.saturation,
+                    ),
             ),
             // Gradient Overlay
             Positioned.fill(
