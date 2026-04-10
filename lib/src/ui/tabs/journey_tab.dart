@@ -14,9 +14,46 @@ import '../widgets/panel.dart';
 import '../widgets/stat_bar.dart';
 import '../overlay/overlay_service.dart';
 import 'character_tab.dart';
+import '../../data/models/journey_level.dart';
 
-class JourneyTab extends StatelessWidget {
+class JourneyTab extends StatefulWidget {
   const JourneyTab({super.key});
+
+  @override
+  State<JourneyTab> createState() => _JourneyTabState();
+}
+
+class _JourneyTabState extends State<JourneyTab> {
+  bool _isEndless = false;
+
+  void _startLevel(GameState gs, int levelId) {
+    gs.setIsEndlessMode(_isEndless);
+    gs.resetForNewRun();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ActiveJourneyPage(initialStep: 0, level: _isEndless ? null : levelId),
+      ),
+    );
+  }
+
+  void _resumeCheckpoint(GameState gs, int resumeStep) {
+    gs.setIsEndlessMode(false);
+    gs.prepareForCheckpointRun();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ActiveJourneyPage(initialStep: resumeStep),
+      ),
+    );
+  }
+
+  void _continueRun(GameState gs) {
+    final step = gs.profile.savedStep ?? 0;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ActiveJourneyPage(initialStep: step),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,45 +62,6 @@ class JourneyTab extends StatelessWidget {
     final canContinue = (gs.profile.savedStep ?? 0) > 0;
     final scheme = Theme.of(context).colorScheme;
     final muted = scheme.onSurface.withValues(alpha: 0.72);
-
-    Future<void> openStartDialog() async {
-      final choice = await showDialog<_StartChoice>(
-        context: context,
-        builder: (ctx) {
-          return _StartRunDialog(gs: gs);
-        },
-      );
-
-      if (choice == null || !context.mounted) return;
-
-      if (choice.type == _StartChoiceType.newRun) {
-        gs.setIsEndlessMode(choice.isEndless);
-        gs.resetForNewRun();
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder:
-                (_) => ActiveJourneyPage(initialStep: 0, level: choice.level),
-          ),
-        );
-      } else if (choice.type == _StartChoiceType.resume) {
-        gs.setIsEndlessMode(
-          false,
-        ); // checkpoints only for levels? Or keep current
-        gs.prepareForCheckpointRun();
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => ActiveJourneyPage(initialStep: resumeStep),
-          ),
-        );
-      } else if (choice.type == _StartChoiceType.continueRun) {
-        final step = gs.profile.savedStep ?? 0;
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => ActiveJourneyPage(initialStep: step),
-          ),
-        );
-      }
-    }
 
     return Container(
       decoration: BoxDecoration(
@@ -84,7 +82,7 @@ class JourneyTab extends StatelessWidget {
             vertical: AppTokens.gap48,
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
+            constraints: const BoxConstraints(maxWidth: 800),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -154,6 +152,7 @@ class JourneyTab extends StatelessWidget {
 
                 // Stats HUD Section
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     _HubStatChip(
                       icon: Icons.emoji_events_rounded,
@@ -179,37 +178,209 @@ class JourneyTab extends StatelessWidget {
                 ),
                 const SizedBox(height: AppTokens.gap32),
 
-                // Action Section
-                SizedBox(
-                  width: double.infinity,
-                  height: 64,
-                  child: FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppTokens.r12 * 1.5,
+                // Action Section (Levels & Continue)
+                if (canContinue)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: SizedBox(
+                      width: 400,
+                      height: 64,
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppTokens.r12 * 1.5),
+                          ),
+                          elevation: 8,
+                          backgroundColor: scheme.primary,
+                        ),
+                        onPressed: () => _continueRun(gs),
+                        icon: const Icon(Icons.play_arrow_rounded, size: 28),
+                        label: Text(
+                          'Continue Journey (Step ${gs.profile.savedStep})',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                       ),
-                      elevation: 12,
-                      shadowColor: scheme.primary.withValues(alpha: 0.35),
-                      backgroundColor: scheme.primary,
-                      foregroundColor: scheme.onPrimary,
                     ),
-                    onPressed: openStartDialog,
-                    icon: const Icon(Icons.explore_rounded, size: 28),
-                    label: const Text(
-                      'Begin Expedition',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
+                  ),
+
+                if (resumeStep >= 50 && !canContinue)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: SizedBox(
+                      width: 400,
+                      height: 56,
+                      child: FilledButton.tonalIcon(
+                        onPressed: () => _resumeCheckpoint(gs, resumeStep),
+                        icon: const Icon(Icons.restore),
+                        label: Text('Resume from Checkpoint (Step $resumeStep)'),
                       ),
                     ),
+                  ),
+                  
+                SwitchListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                  title: const Text('Endless Mode', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Classic randomized infinite loop with gifts.'),
+                  value: _isEndless,
+                  onChanged: (val) => setState(() => _isEndless = val),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Horizontal Level List
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Select Expedition',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold
+                    ),
+                  )
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 240,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: JourneyLevelConfig.allLevels.length,
+                    itemBuilder: (context, index) {
+                      final level = JourneyLevelConfig.allLevels[index];
+                      final isUnlocked = level.levelId <= gs.profile.highestUnlockedLevel;
+                      
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 16),
+                        child: _LevelCard(
+                          level: level,
+                          isUnlocked: isUnlocked,
+                          isEndless: _isEndless,
+                          onTap: isUnlocked ? () => _startLevel(gs, level.levelId) : null,
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LevelCard extends StatelessWidget {
+  final JourneyLevelConfig level;
+  final bool isUnlocked;
+  final bool isEndless;
+  final VoidCallback? onTap;
+
+  const _LevelCard({
+    required this.level,
+    required this.isUnlocked,
+    required this.isEndless,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 180,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+             BoxShadow(
+               color: Colors.black.withValues(alpha: 0.3),
+               blurRadius: 10,
+               offset: const Offset(0, 4),
+             ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            // Preview Image
+            Positioned.fill(
+              child: Image.asset(
+                level.backgroundAsset,
+                fit: BoxFit.cover,
+                color: isUnlocked ? null : Colors.grey,
+                colorBlendMode: isUnlocked ? null : BlendMode.saturation,
+              ),
+            ),
+            // Gradient Overlay
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.8),
+                    ],
+                    stops: const [0.4, 1.0],
+                  ),
+                ),
+              ),
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: level.themeColor.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'Level ${level.levelId}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    level.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    isUnlocked ? level.description : 'Locked',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (!isUnlocked)
+               Positioned.fill(
+                 child: Container(
+                   color: Colors.black.withValues(alpha: 0.4),
+                   child: const Center(
+                     child: Icon(Icons.lock_rounded, color: Colors.white54, size: 40),
+                   ),
+                 ),
+               ),
+          ],
         ),
       ),
     );
@@ -273,139 +444,6 @@ class _HubStatChip extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-enum _StartChoiceType { newRun, resume, continueRun }
-
-class _StartChoice {
-  final _StartChoiceType type;
-  final bool isEndless;
-  final int? level;
-  _StartChoice({required this.type, this.isEndless = false, this.level});
-}
-
-class _StartRunDialog extends StatefulWidget {
-  final GameState gs;
-  const _StartRunDialog({required this.gs});
-
-  @override
-  State<_StartRunDialog> createState() => _StartRunDialogState();
-}
-
-class _StartRunDialogState extends State<_StartRunDialog> {
-  bool _isEndless = false;
-  int _selectedLevel = 1;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedLevel = widget.gs.profile.highestUnlockedLevel;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final gs = widget.gs;
-    final canContinue = (gs.profile.savedStep ?? 0) > 0;
-    final resumeStep = (gs.profile.highScore ~/ 50) * 50;
-
-    return AlertDialog(
-      title: const Text('Start Journey'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (canContinue)
-              _ChoiceTile(
-                title: 'Continue',
-                subtitle: 'Step ${gs.profile.savedStep}',
-                onTap:
-                    () => Navigator.pop(
-                      context,
-                      _StartChoice(type: _StartChoiceType.continueRun),
-                    ),
-              ),
-            if (resumeStep >= 50)
-              _ChoiceTile(
-                title: 'Resume Checkpoint',
-                subtitle: 'Step $resumeStep',
-                onTap:
-                    () => Navigator.pop(
-                      context,
-                      _StartChoice(type: _StartChoiceType.resume),
-                    ),
-              ),
-            const Divider(),
-            SwitchListTile(
-              title: const Text(
-                'Endless Mode',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              subtitle: const Text('Classic mode with gifts'),
-              value: _isEndless,
-              onChanged: (v) => setState(() => _isEndless = v),
-            ),
-            if (!_isEndless) ...[
-              const SizedBox(height: 8),
-              const Text(
-                'Select Level:',
-                style: TextStyle(fontSize: 12, color: Colors.black45),
-              ),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 8,
-                children: List.generate(gs.profile.highestUnlockedLevel, (i) {
-                  final lvl = i + 1;
-                  final isSelected = _selectedLevel == lvl;
-                  return ChoiceChip(
-                    label: Text('Lvl $lvl'),
-                    selected: isSelected,
-                    onSelected: (v) => setState(() => _selectedLevel = lvl),
-                  );
-                }),
-              ),
-            ],
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed:
-                    () => Navigator.pop(
-                      context,
-                      _StartChoice(
-                        type: _StartChoiceType.newRun,
-                        isEndless: _isEndless,
-                        level: _isEndless ? null : _selectedLevel,
-                      ),
-                    ),
-                child: const Text('Begin New Run'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ChoiceTile extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  const _ChoiceTile({
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Text(subtitle),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: onTap,
     );
   }
 }
@@ -842,7 +880,7 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage>
         _monster = Monster.bossForLevel(gs, level, _rnd);
         _startCombat(gs);
       } else if (_rnd.nextDouble() < 0.35) {
-        _monster = Monster.randomForStep(gs, _step, _rnd);
+        _monster = Monster.randomForStep(gs, _step, _rnd, levelId: level);
         _startCombat(gs);
       } else if (_rnd.nextDouble() < 0.10) {
         var restorePoints = 10 + (_step ~/ 10);
@@ -1816,6 +1854,7 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage>
                     child: _ParallaxEnvironment(
                       offset: totalOffset,
                       advanceProgress: _worldController.value,
+                      levelId: widget.level,
                     ),
                   ),
                   if (_encounterBanner != null)
@@ -2991,7 +3030,6 @@ class _DamageFloat {
   });
 }
 
-enum MonsterType { slime, wolf, bandit, spider, skeleton, orc, ghost, demon }
 
 class Monster {
   final String name;
@@ -3033,7 +3071,7 @@ class Monster {
     isBoss: isBoss,
   );
 
-  static Monster randomForStep(GameState gs, int step, Random rnd) {
+  static Monster randomForStep(GameState gs, int step, Random rnd, {int? levelId}) {
     final maxHp = 12 + (step ~/ 5);
     // Base 1000ms, adjust +/- up to 200ms, slightly faster as step increases
     final variance = rnd.nextInt(401) - 200; // -200..+200
@@ -3047,21 +3085,26 @@ class Monster {
     final accVar = (rnd.nextDouble() - 0.5) * 0.1; // +/-0.05
     final accuracy = (accBase + accVar).clamp(0.4, 0.95);
 
-    const names = [
-      'Slime',
-      'Wolf',
-      'Bandit',
-      'Spider',
-      'Skeleton',
-      'Skeleton Warrior',
-      'Orc',
-      'Orc Brute',
-      'Ghost',
-      'Ghost Wraith',
-      'Demon',
-      'Demon Lord',
-    ];
-    final String name = names[rnd.nextInt(names.length)];
+    var allowedTypes = MonsterType.values;
+    if (levelId != null) {
+      allowedTypes = JourneyLevelConfig.getLevel(levelId).allowedMonsters;
+    }
+
+    final possibleNames = <String>[];
+    for (final t in allowedTypes) {
+      if (t == MonsterType.slime) possibleNames.add('Slime');
+      if (t == MonsterType.wolf) possibleNames.add('Wolf');
+      if (t == MonsterType.bandit) possibleNames.add('Bandit');
+      if (t == MonsterType.spider) possibleNames.add('Spider');
+      if (t == MonsterType.skeleton) possibleNames.addAll(['Skeleton', 'Skeleton Warrior']);
+      if (t == MonsterType.orc) possibleNames.addAll(['Orc', 'Orc Brute']);
+      if (t == MonsterType.ghost) possibleNames.addAll(['Ghost', 'Ghost Wraith']);
+      if (t == MonsterType.demon) possibleNames.addAll(['Demon', 'Demon Lord']);
+    }
+    
+    if (possibleNames.isEmpty) possibleNames.add('Slime');
+
+    final String name = possibleNames[rnd.nextInt(possibleNames.length)];
     final type = switch (name) {
       'Slime' => MonsterType.slime,
       'Wolf' => MonsterType.wolf,
@@ -3165,7 +3208,7 @@ class Monster {
     if (level == null) return randomForStep(gs, 100, rnd);
     // bosses are much tougher
     final scale = 1.0 + (level * 0.5);
-    final base = randomForStep(gs, level * 10, rnd);
+    final base = randomForStep(gs, level * 10, rnd, levelId: level);
 
     return Monster(
       name: 'BOSS: ${base.name}',
@@ -3373,16 +3416,22 @@ class ShakeWidgetState extends State<ShakeWidget>
 class _ParallaxEnvironment extends StatelessWidget {
   final double offset;
   final double advanceProgress;
+  final int? levelId;
 
   const _ParallaxEnvironment({
     required this.offset,
     required this.advanceProgress,
+    this.levelId,
   });
 
   @override
   Widget build(BuildContext context) {
     // Walking bob: subtle vertical oscillation during advancement
     final bob = advanceProgress > 0 ? sin(advanceProgress * pi * 2) * 8.0 : 0.0;
+
+    final bgPath = levelId != null 
+        ? JourneyLevelConfig.getLevel(levelId!).backgroundAsset
+        : 'assets/images/backgrounds/battle_bg.png';
 
     return Stack(
       children: [
@@ -3393,7 +3442,7 @@ class _ParallaxEnvironment extends StatelessWidget {
           child: Transform.translate(
             offset: Offset(0, bob),
             child: Image.asset(
-              'assets/images/backgrounds/battle_bg.png',
+              bgPath,
               repeat: ImageRepeat.repeatX,
               fit: BoxFit.cover,
               height: double.infinity,
