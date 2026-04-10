@@ -90,7 +90,7 @@ class Item {
       folder = t; // armor, boots
     }
 
-    final ext = t == 'armor' ? 'webp' : 'png';
+    final ext = 'png';
     final code = _rarityDigit(rarity);
 
     // Use a stable seed based on the item ID so the graphics don't "flicker" on every rebuild.
@@ -280,7 +280,7 @@ class Item {
     final rnd = Random();
     final typeRoll = rnd.nextInt(4);
     final type = ItemType.values[typeRoll];
-    
+
     // Heroic items start at a higher baseline baseline
     // Level is fixed at 1 for new purchases, but rarity provides core power.
     final level = 1;
@@ -340,7 +340,12 @@ class Item {
       ItemRarity.mystic => 'Ancestral ',
     };
 
-    final stats = _rollAdditionalStats(type, rarity, 5, rnd); // Roll as if level 5 for better stats
+    final stats = _rollAdditionalStats(
+      type,
+      rarity,
+      5,
+      rnd,
+    ); // Roll as if level 5 for better stats
 
     return Item(
       id: idGen(),
@@ -369,11 +374,15 @@ class Item {
     }
   }
 
-  static String? _itemImagePath(ItemType type, ItemRarity rarity, Random rnd,
-      {String? weaponCategory}) {
+  static String? _itemImagePath(
+    ItemType type,
+    ItemRarity rarity,
+    Random rnd, {
+    String? weaponCategory,
+  }) {
     switch (type) {
       case ItemType.weapon:
-        return _weaponImagePath(rarity, rnd, category: weaponCategory);
+        return _weaponImagePath(rarity, rnd, weaponCategory: weaponCategory);
       case ItemType.armor:
         return _armorImagePath(rarity, rnd);
       case ItemType.ring:
@@ -384,41 +393,52 @@ class Item {
   }
 
   // Choose a weapon sprite path like assets/images/weapons/dagger_21.png
-  static String _weaponImagePath(ItemRarity rarity, Random rnd,
-      {String? category}) {
-    const categories = [
-      'dagger',
-      'sword',
-      'axe',
-      'mace',
-      'bow',
-      'staff',
-    ];
-    final cat = category ?? categories[rnd.nextInt(categories.length)];
-    final rarityCode = _rarityDigit(rarity);
-    
-    // Calculate variant ID.
-    // Daggers have variants 1..6 for rarity 0, 1..2 for others.
-    // Others currently have variant 1.
+  static String _weaponImagePath(
+    ItemRarity rarity,
+    Random rnd, {
+    String? weaponCategory,
+  }) {
+    final cat = weaponCategory ?? 'sword';
+    final rarityCode = switch (rarity) {
+      ItemRarity.normal => '0',
+      ItemRarity.uncommon => '1',
+      ItemRarity.rare => '2',
+      ItemRarity.legendary => '3',
+      ItemRarity.mystic => '3', // Fallback to 3 since 4 doesn't exist yet
+    };
+
+    // For non-dagger weapons, safe-guard them based on known assets
+    if (cat == 'axe' || cat == 'bow') {
+      return 'assets/images/weapons/${cat}_31.png';
+    } else if (cat == 'staff') {
+      if (rarityCode == '0' || rarityCode == '1')
+        return 'assets/images/weapons/staff_01.png';
+      return 'assets/images/weapons/staff_31.png';
+    } else if (cat == 'mace' || cat == 'sword') {
+      return 'assets/images/weapons/${cat}_${rarityCode}1.png';
+    }
+
+    // Default: dagger logic
     int variantId = 1;
     if (cat == 'dagger') {
-      if (rarity == ItemRarity.normal) {
+      if (rarityCode == '0') {
         variantId = 1 + rnd.nextInt(6);
-      } else if (rarity == ItemRarity.uncommon) {
+      } else if (rarityCode == '1') {
         variantId = 1 + rnd.nextInt(2);
-      } else if (rarity == ItemRarity.rare) {
+      } else if (rarityCode == '2') {
         variantId = 1 + rnd.nextInt(3);
-      } else if (rarity == ItemRarity.legendary) {
+      } else if (rarityCode == '3') {
         variantId = 1 + rnd.nextInt(2);
       }
     }
-    
+
     return 'assets/images/weapons/${cat}_$rarityCode$variantId.png';
   }
 
   static String _armorImagePath(ItemRarity rarity, Random rnd) {
     final rarityCode = _rarityDigit(rarity);
-    return 'assets/images/armor/armor_${rarityCode}1.webp';
+    if (rarityCode == '4') return 'assets/images/armor/armor_41.png';
+    return 'assets/images/armor/armor_${rarityCode}1.png';
   }
 
   static String _ringImagePath(ItemRarity rarity, Random rnd) {
@@ -430,7 +450,6 @@ class Item {
     final rarityCode = _rarityDigit(rarity);
     return 'assets/images/boots/boots_${rarityCode}1.png';
   }
-
 
   static ItemRarity _rollRarity(Random rnd) {
     final p = rnd.nextDouble();

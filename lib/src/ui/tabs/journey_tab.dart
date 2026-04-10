@@ -35,20 +35,20 @@ class JourneyTab extends StatelessWidget {
       );
 
       if (choice == null || !context.mounted) return;
-      
+
       if (choice.type == _StartChoiceType.newRun) {
         gs.setIsEndlessMode(choice.isEndless);
         gs.resetForNewRun();
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => ActiveJourneyPage(
-              initialStep: 0, 
-              level: choice.level,
-            ),
+            builder:
+                (_) => ActiveJourneyPage(initialStep: 0, level: choice.level),
           ),
         );
       } else if (choice.type == _StartChoiceType.resume) {
-        gs.setIsEndlessMode(false); // checkpoints only for levels? Or keep current
+        gs.setIsEndlessMode(
+          false,
+        ); // checkpoints only for levels? Or keep current
         gs.prepareForCheckpointRun();
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -79,7 +79,10 @@ class JourneyTab extends StatelessWidget {
       ),
       child: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: AppTokens.gap24, vertical: AppTokens.gap48),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.gap24,
+            vertical: AppTokens.gap48,
+          ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 440),
             child: Column(
@@ -121,7 +124,7 @@ class JourneyTab extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppTokens.gap32),
-                
+
                 // Title & Subtitle
                 Text(
                   'The Wanderer\'s Trail',
@@ -134,7 +137,9 @@ class JourneyTab extends StatelessWidget {
                 ),
                 const SizedBox(height: AppTokens.gap12),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppTokens.gap16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTokens.gap16,
+                  ),
                   child: Text(
                     'Forge your path through the unknown. Face the encounters, collect legendary gear, and survive the trail.',
                     textAlign: TextAlign.center,
@@ -146,7 +151,7 @@ class JourneyTab extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppTokens.gap48),
-                
+
                 // Stats HUD Section
                 Row(
                   children: [
@@ -173,7 +178,7 @@ class JourneyTab extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: AppTokens.gap32),
-                
+
                 // Action Section
                 SizedBox(
                   width: double.infinity,
@@ -181,7 +186,9 @@ class JourneyTab extends StatelessWidget {
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppTokens.r12 * 1.5),
+                        borderRadius: BorderRadius.circular(
+                          AppTokens.r12 * 1.5,
+                        ),
                       ),
                       elevation: 12,
                       shadowColor: scheme.primary.withValues(alpha: 0.35),
@@ -313,24 +320,38 @@ class _StartRunDialogState extends State<_StartRunDialog> {
               _ChoiceTile(
                 title: 'Continue',
                 subtitle: 'Step ${gs.profile.savedStep}',
-                onTap: () => Navigator.pop(context, _StartChoice(type: _StartChoiceType.continueRun)),
+                onTap:
+                    () => Navigator.pop(
+                      context,
+                      _StartChoice(type: _StartChoiceType.continueRun),
+                    ),
               ),
             if (resumeStep >= 50)
               _ChoiceTile(
                 title: 'Resume Checkpoint',
                 subtitle: 'Step $resumeStep',
-                onTap: () => Navigator.pop(context, _StartChoice(type: _StartChoiceType.resume)),
+                onTap:
+                    () => Navigator.pop(
+                      context,
+                      _StartChoice(type: _StartChoiceType.resume),
+                    ),
               ),
             const Divider(),
             SwitchListTile(
-              title: const Text('Endless Mode', style: TextStyle(fontWeight: FontWeight.bold)),
+              title: const Text(
+                'Endless Mode',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               subtitle: const Text('Classic mode with gifts'),
               value: _isEndless,
               onChanged: (v) => setState(() => _isEndless = v),
             ),
             if (!_isEndless) ...[
               const SizedBox(height: 8),
-              const Text('Select Level:', style: TextStyle(fontSize: 12, color: Colors.black45)),
+              const Text(
+                'Select Level:',
+                style: TextStyle(fontSize: 12, color: Colors.black45),
+              ),
               const SizedBox(height: 4),
               Wrap(
                 spacing: 8,
@@ -349,11 +370,15 @@ class _StartRunDialogState extends State<_StartRunDialog> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: () => Navigator.pop(context, _StartChoice(
-                  type: _StartChoiceType.newRun,
-                  isEndless: _isEndless,
-                  level: _isEndless ? null : _selectedLevel,
-                )),
+                onPressed:
+                    () => Navigator.pop(
+                      context,
+                      _StartChoice(
+                        type: _StartChoiceType.newRun,
+                        isEndless: _isEndless,
+                        level: _isEndless ? null : _selectedLevel,
+                      ),
+                    ),
                 child: const Text('Begin New Run'),
               ),
             ),
@@ -368,7 +393,11 @@ class _ChoiceTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-  const _ChoiceTile({required this.title, required this.subtitle, required this.onTap});
+  const _ChoiceTile({
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -390,7 +419,8 @@ class ActiveJourneyPage extends StatefulWidget {
   State<ActiveJourneyPage> createState() => _ActiveJourneyPageState();
 }
 
-class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProviderStateMixin {
+class _ActiveJourneyPageState extends State<ActiveJourneyPage>
+    with TickerProviderStateMixin {
   bool _leaveDialogOpen = false;
 
   void _requestLeave() {
@@ -410,6 +440,7 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
     final gs2 = context.read<GameState>();
     final confirm = await showDialog<bool>(
       context: context,
+      useRootNavigator: false,
       builder:
           (ctx) => AlertDialog(
             title: const Text('Leave journey?'),
@@ -428,12 +459,17 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
             ],
           ),
     );
-    _leaveDialogOpen = false;
     if (confirm == true) {
       gs2.endJourney(saveStep: _step);
       gs2.setCombatActive(false);
       _stopCombat();
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        // Pop the ActiveJourneyPage
+        Navigator.of(context).pop();
+      }
+    } else {
+      // If we stayed, allow opening the dialog again
+      _leaveDialogOpen = false;
     }
   }
 
@@ -444,7 +480,8 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
 
   // World Travel Animation
   late final AnimationController _worldController;
-  late final AnimationController _livingDriftController; // Phase 6: Continuous idle drift
+  late final AnimationController
+  _livingDriftController; // Phase 6: Continuous idle drift
   double _worldOffset = 0.0;
   double _lastWorldOffset = 0.0;
 
@@ -504,14 +541,19 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
   void _useActiveSkill(GameState gs) {
     final skill = gs.profile.heroClass.skill;
     if (skill == null || !_canUseSkill(gs) || _monster == null) return;
-    
+
     gs.startSkillCooldown(skill.id);
 
     final now = DateTime.now();
     bool isEnemyTarget = false;
     double dmgMult = 1.0;
-    
-    if (['power_strike', 'fireball', 'arcane_burst', 'execution'].contains(skill.id)) {
+
+    if ([
+      'power_strike',
+      'fireball',
+      'arcane_burst',
+      'execution',
+    ].contains(skill.id)) {
       isEnemyTarget = true;
       if (skill.id == 'power_strike') dmgMult = 1.5;
       if (skill.id == 'fireball') dmgMult = 2.0;
@@ -521,23 +563,60 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
 
     if (isEnemyTarget) {
       int dmg = (gs.statsSummary.attack * dmgMult).round();
-      
-      if (skill.id == 'execution' && ((_monster!.hp / _monster!.maxHp) < 0.25)) {
+
+      bool isExecution = false;
+      if (skill.id == 'execution' &&
+          ((_monster!.hp / _monster!.maxHp) < 0.25)) {
         dmg = _monster!.hp; // Instant kill
-        _floats.add(_DamageFloat(text: 'EXECUTED!', color: Colors.red, start: now, duration: const Duration(milliseconds: 2000), xFrac: 0.5, yFrac: 0.1, rise: 80, punch: true, fontSize: 32));
+        isExecution = true;
+        _floats.add(
+          _DamageFloat(
+            text: 'EXECUTED!',
+            color: Colors.red,
+            start: now,
+            duration: const Duration(milliseconds: 2000),
+            xFrac: 0.5,
+            yFrac: 0.1,
+            rise: 80,
+            punch: true,
+            fontSize: 32,
+          ),
+        );
       } else {
-        _floats.add(_DamageFloat(text: '$dmg (${skill.name}!)', color: Colors.deepOrangeAccent, start: now, duration: const Duration(milliseconds: 1500), xFrac: 0.5, yFrac: 0.2, rise: 50, punch: true, fontSize: 26));
+        _floats.add(
+          _DamageFloat(
+            text: '$dmg (${skill.name}!)',
+            color: Colors.deepOrangeAccent,
+            start: now,
+            duration: const Duration(milliseconds: 1500),
+            xFrac: 0.5,
+            yFrac: 0.2,
+            rise: 50,
+            punch: true,
+            fontSize: 26,
+          ),
+        );
       }
-      
-      _log('Used ${skill.name}! Deals $dmg damage.', gs.profile.heroClass.rarityColor, icon: Icons.local_fire_department);
-      
-      final finalDamage = _reduceByDefense(dmg, _monster!.defense);
+
+      _log(
+        'Used ${skill.name}! Deals $dmg damage.',
+        gs.profile.heroClass.rarityColor,
+        icon: Icons.local_fire_department,
+      );
+
+      final finalDamage =
+          isExecution ? dmg : _reduceByDefense(dmg, _monster!.defense);
       setState(() {
         _monsterHitVersion++;
         _monster = _monster!.hit(finalDamage);
       });
       _notePlayerDamageToMonster(finalDamage);
-      
+
+      // Stagger the monster slightly for heavy hits, or just reset its timer so the player isn't punished by an instant monster counter.
+      if (_nextMonsterHit != null) {
+        _nextMonsterHit = now.add(Duration(milliseconds: _monsterIntervalMs));
+      }
+
       if (skill.id == 'fireball') {
         _monsterBurnTicks += 5;
       } else if (skill.id == 'arcane_burst') {
@@ -546,25 +625,57 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
     } else {
       // Self-targeted or buffs
       if (skill.id == 'holy_aegis') {
-        _log('Used Holy Aegis! Invulnerable for 5s.', gs.profile.heroClass.rarityColor, icon: Icons.security);
+        _log(
+          'Used Holy Aegis! Invulnerable for 5s.',
+          gs.profile.heroClass.rarityColor,
+          icon: Icons.security,
+        );
         setState(() => _isInvulnerable = true);
         _invulTimer?.cancel();
         _invulTimer = Timer(const Duration(seconds: 5), () {
           if (mounted) setState(() => _isInvulnerable = false);
         });
-        
+
         final heal = (gs.profile.maxHealth * 0.3).round();
         gs.loseHealth(-heal);
-        _floats.add(_DamageFloat(text: '+$heal', color: Colors.greenAccent, start: now, duration: const Duration(milliseconds: 1200), xFrac: 0.15, yFrac: 0.1, rise: 30));
-      } else if (['iron_wall', 'shadow_strike', 'bloodlust'].contains(skill.id)) {
-        _log('Activated ${skill.name}!', gs.profile.heroClass.rarityColor, icon: Icons.auto_awesome);
+        _floats.add(
+          _DamageFloat(
+            text: '+$heal',
+            color: Colors.greenAccent,
+            start: now,
+            duration: const Duration(milliseconds: 1200),
+            xFrac: 0.15,
+            yFrac: 0.1,
+            rise: 30,
+          ),
+        );
+      } else if ([
+        'iron_wall',
+        'shadow_strike',
+        'bloodlust',
+      ].contains(skill.id)) {
+        _log(
+          'Activated ${skill.name}!',
+          gs.profile.heroClass.rarityColor,
+          icon: Icons.auto_awesome,
+        );
         gs.activateSkillBuff(skill.id);
-        _floats.add(_DamageFloat(text: '${skill.name}!', color: Colors.purpleAccent, start: now, duration: const Duration(milliseconds: 1200), xFrac: 0.15, yFrac: 0.1, rise: 30));
+        _floats.add(
+          _DamageFloat(
+            text: '${skill.name}!',
+            color: Colors.purpleAccent,
+            start: now,
+            duration: const Duration(milliseconds: 1200),
+            xFrac: 0.15,
+            yFrac: 0.1,
+            rise: 30,
+          ),
+        );
       }
     }
 
-    // Reset player attack timer to give instant gratification
-    _nextPlayerHit = DateTime.now().add(Duration(milliseconds: _playerIntervalMs));
+    // Removed player attack timer reset to prevent monster from getting extra hits while player is on CD
+    // _nextPlayerHit = DateTime.now().add(Duration(milliseconds: _playerIntervalMs));
 
     if (_monster != null && _monster!.hp <= 0) {
       if (mounted) _onMonsterDefeated(gs);
@@ -664,7 +775,7 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
     _step = widget.initialStep;
     _worldOffset = _step.toDouble() * 200.0;
     _lastWorldOffset = _worldOffset;
-    
+
     _worldController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -716,7 +827,7 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
       _step += 1;
       _lastWorldOffset = _worldOffset;
       _worldController.forward(from: 0.0);
-      
+
       final level = widget.level;
       final maxStages = level != null ? level * 10 : null;
 
@@ -766,7 +877,11 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
     _combatRepaint.value++;
 
     final encounterName = _monster!.name;
-    _log('Attacked by $encounterName!', Colors.orangeAccent, icon: Icons.warning_amber_rounded);
+    _log(
+      'Attacked by $encounterName!',
+      Colors.orangeAccent,
+      icon: Icons.warning_amber_rounded,
+    );
     _showEncounterBanner(encounterName);
 
     _combatTimer = Timer.periodic(const Duration(milliseconds: 100), (t) {
@@ -788,7 +903,17 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
       if (_monsterBurnTicks > 0 && (_combatTimer?.tick ?? 0) % 10 == 0) {
         _monsterBurnTicks--;
         final burnDmg = max(1, (_monster!.maxHp * 0.05).round());
-        _floats.add(_DamageFloat(text: '-$burnDmg (Burn)', color: Colors.orange, start: now, duration: const Duration(milliseconds: 800), xFrac: 0.7, yFrac: 0.1, rise: 20));
+        _floats.add(
+          _DamageFloat(
+            text: '-$burnDmg (Burn)',
+            color: Colors.orange,
+            start: now,
+            duration: const Duration(milliseconds: 800),
+            xFrac: 0.7,
+            yFrac: 0.1,
+            rise: 20,
+          ),
+        );
         setState(() => _monster = _monster!.hit(burnDmg));
         if (_monster!.hp <= 0 && !_monsterDying) {
           setState(() => _monsterDying = true);
@@ -858,7 +983,11 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
               icon: Icons.auto_awesome,
             );
           } else {
-            _log('Hit ${_monster!.name} for $finalDamage.', const Color(0xFF2E7D32), icon: Icons.colorize);
+            _log(
+              'Hit ${_monster!.name} for $finalDamage.',
+              const Color(0xFF2E7D32),
+              icon: Icons.colorize,
+            );
           }
 
           setState(() {
@@ -868,14 +997,27 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
           _onPlayerAttackResolved(finalDamage);
           if (_monster!.hp <= 0) {
             // Skeleton Reassemble check
-            if (_monster!.type == MonsterType.skeleton && !_skeletonReassembled) {
-              final chance = gs.cfgNum(['skeleton', 'reassemble', 'chance'], 0.3);
+            if (_monster!.type == MonsterType.skeleton &&
+                !_skeletonReassembled) {
+              final chance = gs.cfgNum([
+                'skeleton',
+                'reassemble',
+                'chance',
+              ], 0.3);
               if (_rnd.nextDouble() < chance) {
                 _skeletonReassembled = true;
-                final hpPct = gs.cfgNum(['skeleton', 'reassemble', 'hp_percent'], 0.35);
+                final hpPct = gs.cfgNum([
+                  'skeleton',
+                  'reassemble',
+                  'hp_percent',
+                ], 0.35);
                 final heal = (_monster!.maxHp * hpPct).toInt();
                 _monster = _monster!.hit(-heal); // Heal back
-                _log('Skeleton reassembled with $heal HP!', const Color(0xFF1A1C1E), icon: Icons.refresh);
+                _log(
+                  'Skeleton reassembled with $heal HP!',
+                  const Color(0xFF1A1C1E),
+                  icon: Icons.refresh,
+                );
                 OverlayService.showToast('Skeleton rattling back to life!');
                 // Spawn "REVIVE" float
                 _floats.add(
@@ -904,7 +1046,11 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
           // Miss or Evaded float
           final fx = 0.5 + (_rnd.nextDouble() - 0.5) * 0.18;
           final msg = evaded ? 'EVADED' : 'MISS';
-          _log('You ${evaded ? "were evaded by" : "missed"} ${_monster!.name}.', const Color(0xFF42474E).withValues(alpha: 0.6), icon: Icons.close);
+          _log(
+            'You ${evaded ? "were evaded by" : "missed"} ${_monster!.name}.',
+            const Color(0xFF42474E).withValues(alpha: 0.6),
+            icon: Icons.close,
+          );
           _floats.add(
             _DamageFloat(
               text: msg,
@@ -932,8 +1078,23 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
         if (hit) {
           if (_isInvulnerable) {
             final fx = 0.15 + (_rnd.nextDouble() - 0.5) * 0.12;
-            _floats.add(_DamageFloat(text: 'BLOCKED', color: Colors.amber, start: now, duration: const Duration(milliseconds: 1000), xFrac: fx, yFrac: 0.08, rise: 26, fontSize: 20));
-            _log('Blocked ${_monster!.name}\'s attack with Holy Aegis.', Colors.amber, icon: Icons.security);
+            _floats.add(
+              _DamageFloat(
+                text: 'BLOCKED',
+                color: Colors.amber,
+                start: now,
+                duration: const Duration(milliseconds: 1000),
+                xFrac: fx,
+                yFrac: 0.08,
+                rise: 26,
+                fontSize: 20,
+              ),
+            );
+            _log(
+              'Blocked ${_monster!.name}\'s attack with Holy Aegis.',
+              Colors.amber,
+              icon: Icons.security,
+            );
             _onMonsterAttackResolved(0);
             return;
           }
@@ -953,7 +1114,11 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
           if (_monster!.type == MonsterType.orc) {
             final chance = gs.cfgNum(['orc', 'crushing_blow', 'chance'], 0.25);
             if (_rnd.nextDouble() < chance) {
-              final ignore = gs.cfgNum(['orc', 'crushing_blow', 'defense_ignore'], 0.5);
+              final ignore = gs.cfgNum([
+                'orc',
+                'crushing_blow',
+                'defense_ignore',
+              ], 0.5);
               finalDef = (defense * (1.0 - ignore)).round();
               crushed = true;
             }
@@ -961,7 +1126,11 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
           final dmg = _reduceByDefense(raw, finalDef);
           monsterSwingDamage = dmg;
           if (crushed) {
-            _log('Orc CRUSHING BLOW ignored some defense!', Colors.orangeAccent, icon: Icons.gavel);
+            _log(
+              'Orc CRUSHING BLOW ignored some defense!',
+              Colors.orangeAccent,
+              icon: Icons.gavel,
+            );
             _floats.add(
               _DamageFloat(
                 text: 'CRUSH',
@@ -991,7 +1160,11 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
             ),
           );
           gs.loseHealth(dmg);
-          _log('${_monster!.name} hit you for $dmg.', Colors.redAccent, icon: Icons.bolt);
+          _log(
+            '${_monster!.name} hit you for $dmg.',
+            Colors.redAccent,
+            icon: Icons.bolt,
+          );
           _shakeKey.currentState?.shake();
           if (_monster!.type == MonsterType.spider) {
             final t = _monster!.tier;
@@ -1081,7 +1254,11 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
                 ),
               );
               gs.loseHealth(extra);
-              _log('Wolf double claw hit for $extra!', Colors.redAccent, icon: Icons.bolt);
+              _log(
+                'Wolf double claw hit for $extra!',
+                Colors.redAccent,
+                icon: Icons.bolt,
+              );
               _shakeKey.currentState?.shake();
             }
           }
@@ -1111,7 +1288,11 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
             setState(() {
               _monster = _monster!.hit(-heal); // Heal
             });
-            _log('Demon lifestole $heal HP!', Colors.redAccent, icon: Icons.favorite);
+            _log(
+              'Demon lifestole $heal HP!',
+              Colors.redAccent,
+              icon: Icons.favorite,
+            );
             _floats.add(
               _DamageFloat(
                 text: '+$heal',
@@ -1135,7 +1316,11 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
         } else {
           // Player evaded
           final fx = 0.15 + (_rnd.nextDouble() - 0.5) * 0.12;
-          _log('You evaded ${_monster!.name} attack.', Colors.lightBlueAccent, icon: Icons.shield);
+          _log(
+            'You evaded ${_monster!.name} attack.',
+            Colors.lightBlueAccent,
+            icon: Icons.shield,
+          );
           _floats.add(
             _DamageFloat(
               text: 'EVADE',
@@ -1171,7 +1356,11 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
           ),
         );
         gs.loseHealth(pdmg);
-        _log('Poison deals $pdmg damage.', Colors.purpleAccent, icon: Icons.medical_services);
+        _log(
+          'Poison deals $pdmg damage.',
+          Colors.purpleAccent,
+          icon: Icons.medical_services,
+        );
         _shakeKey.currentState?.shake();
         _poisonTicksRemaining -= 1;
         if (gs.profile.health <= 0) {
@@ -1192,7 +1381,9 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
 
   void _stopCombat({bool notify = true}) {
     final needsFrame =
-        _encounterBanner != null || _encounterBannerTimer != null || _combatTimer != null;
+        _encounterBanner != null ||
+        _encounterBannerTimer != null ||
+        _combatTimer != null;
     _encounterBannerTimer?.cancel();
     _encounterBannerTimer = null;
     _encounterBanner = null;
@@ -1308,17 +1499,21 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
     }
 
     final drop = gs.maybeDrop(runScore: _step);
-    
+
     if (isBoss) {
-      // Boss rewards: Diamonds + Key + Progress
-      gs.rewardBossDefeat(level!);
-      _showBossVictoryDialog(gs, level, drop);
+      // Boss rewards: Diamonds + Key + Permanent Relic
+      final relic = gs.rewardBossDefeat(level!);
+      _showBossVictoryDialog(gs, level, relic);
     } else {
       if (drop != null && mounted) {
-        ItemDropPopup.show(context, drop, onEquip: () {
-          gs.equip(drop);
-          _log('Equipped ${drop.name}.', Colors.blueGrey);
-        });
+        ItemDropPopup.show(
+          context,
+          drop,
+          onEquip: () {
+            gs.equip(drop);
+            _log('Equipped ${drop.name}.', Colors.blueGrey);
+          },
+        );
       } else {
         final msg = gs.applyTemporaryBlessing();
         if (mounted) {
@@ -1332,55 +1527,97 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
       _monster = null;
       _monsterDying = false;
     });
-    
+
     _resetExchangeRoundTracking();
   }
 
-  void _showBossVictoryDialog(GameState gs, int level, Item? drop) {
+  void _showBossVictoryDialog(GameState gs, int level, Item relic) {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('EXPEDITION SUCCESS!'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.emoji_events_rounded, size: 72, color: Colors.amber),
-            const SizedBox(height: 16),
-            Text('Level $level Conquered', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            const Text('You have defeated the boss and earned your rewards!'),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('BOSS DEFEATED!'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.diamond_rounded, color: Colors.cyanAccent),
-                Text(' +${50 + level * 10}'),
-                const SizedBox(width: 16),
-                const Icon(Icons.vpn_key_rounded, color: Colors.amberAccent),
-                const Text(' +1 Key'),
+                const Icon(
+                  Icons.emoji_events_rounded,
+                  size: 72,
+                  color: Colors.amber,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Level $level Conquered',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'You have defeated the boss and earned your rewards!',
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.diamond_rounded, color: Colors.cyanAccent),
+                    Text(' +${50 + level * 10}'),
+                    const SizedBox(width: 16),
+                    const Icon(
+                      Icons.vpn_key_rounded,
+                      color: Colors.amberAccent,
+                    ),
+                    const Text(' +1 Key'),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+                const Text(
+                  'PERMANENT RELIC REWARD:',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: Colors.blueGrey,
+                    fontSize: 10,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  relic.name,
+                  style: TextStyle(
+                    color: Color(rarityColorValue(relic.rarity)),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  relic.rarity.name.toUpperCase(),
+                  style: TextStyle(
+                    color: Color(
+                      rarityColorValue(relic.rarity),
+                    ).withValues(alpha: 0.6),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ],
             ),
-            if (drop != null) ...[
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 8),
-              const Text('Bonus Drop:', style: TextStyle(fontWeight: FontWeight.bold)),
-              Text(drop.name, style: TextStyle(color: drop.rarityColor)),
+            actions: [
+              FilledButton(
+                onPressed: () {
+                  gs.endJourney(
+                    saveStep: null,
+                  ); // Clear level progress as it is complete
+                  Navigator.pop(ctx);
+                  Navigator.pop(context); // Go back to hub
+                },
+                child: const Text('Return to Hub'),
+              ),
             ],
-          ],
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () {
-              gs.endJourney(saveStep: null); // Clear level progress as it is complete
-              Navigator.pop(ctx);
-              Navigator.pop(context); // Go back to hub
-            },
-            child: const Text('Return to Hub'),
           ),
-        ],
-      ),
     );
   }
 
@@ -1388,14 +1625,17 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => _DefeatDialog(
-        step: _step,
-        onConfirm: () {
-          context.read<GameState>().endJourney(); // Preserve existing checkpoint to allow restart
-          Navigator.of(context).pop(); // close dialog
-          Navigator.of(context).pop(); // leave battle page
-        },
-      ),
+      builder:
+          (_) => _DefeatDialog(
+            step: _step,
+            onConfirm: () {
+              context
+                  .read<GameState>()
+                  .endJourney(); // Preserve existing checkpoint to allow restart
+              Navigator.of(context).pop(); // close dialog
+              Navigator.of(context).pop(); // leave battle page
+            },
+          ),
     );
   }
 
@@ -1508,7 +1748,11 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
           title: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.terrain_rounded, size: 18, color: Colors.white70),
+              const Icon(
+                Icons.terrain_rounded,
+                size: 18,
+                color: Colors.white70,
+              ),
               const SizedBox(width: 8),
               Text(
                 'Step $_step',
@@ -1552,10 +1796,16 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
           ],
         ),
         body: AnimatedBuilder(
-          animation: Listenable.merge([_worldController, _livingDriftController]),
+          animation: Listenable.merge([
+            _worldController,
+            _livingDriftController,
+          ]),
           builder: (context, _) {
-            final advanceOffset = _lastWorldOffset + (_worldController.value * 200.0);
-            final driftOffset = _livingDriftController.value * 1200.0; // Wide range for seamless wrapping
+            final advanceOffset =
+                _lastWorldOffset + (_worldController.value * 200.0);
+            final driftOffset =
+                _livingDriftController.value *
+                1200.0; // Wide range for seamless wrapping
             final totalOffset = advanceOffset + driftOffset;
             return ShakeWidget(
               key: _shakeKey,
@@ -1621,10 +1871,15 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
                                   flex: 2,
                                   child: Row(
                                     children: [
-                                      const Icon(Icons.terrain, color: Colors.white70, size: 18),
+                                      const Icon(
+                                        Icons.terrain,
+                                        color: Colors.white70,
+                                        size: 18,
+                                      ),
                                       const SizedBox(width: 8),
                                       Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Text(
@@ -1645,22 +1900,45 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
                                           if (gs.isBlessActive) ...[
                                             const SizedBox(height: 4),
                                             GestureDetector(
-                                              onTap: () => _showBlessingInfo(context, gs),
+                                              onTap:
+                                                  () => _showBlessingInfo(
+                                                    context,
+                                                    gs,
+                                                  ),
                                               child: Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2,
+                                                    ),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.amber.withValues(alpha: 0.15),
-                                                  borderRadius: BorderRadius.circular(4),
-                                                  border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                                                  color: Colors.amber
+                                                      .withValues(alpha: 0.15),
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                  border: Border.all(
+                                                    color: Colors.amber
+                                                        .withValues(alpha: 0.3),
+                                                  ),
                                                 ),
                                                 child: Row(
-                                                  mainAxisSize: MainAxisSize.min,
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
                                                   children: [
-                                                    const Icon(Icons.auto_awesome, color: Colors.amber, size: 10),
+                                                    const Icon(
+                                                      Icons.auto_awesome,
+                                                      color: Colors.amber,
+                                                      size: 10,
+                                                    ),
                                                     const SizedBox(width: 4),
                                                     Text(
                                                       'BLESSED (${gs.blessRemainingSeconds}s)',
-                                                      style: const TextStyle(color: Colors.amber, fontSize: 8, fontWeight: FontWeight.bold),
+                                                      style: const TextStyle(
+                                                        color: Colors.amber,
+                                                        fontSize: 8,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
                                                     ),
                                                   ],
                                                 ),
@@ -1679,7 +1957,11 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        const Icon(Icons.monetization_on, color: Colors.amber, size: 20),
+                                        const Icon(
+                                          Icons.monetization_on,
+                                          color: Colors.amber,
+                                          size: 20,
+                                        ),
                                         const SizedBox(width: 4),
                                         Text(
                                           '${p.coins}',
@@ -1712,14 +1994,22 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
                                           ),
                                           if (_isInvulnerable)
                                             Positioned(
-                                              right: -8, top: -8,
+                                              right: -8,
+                                              top: -8,
                                               child: Container(
                                                 padding: EdgeInsets.all(2),
-                                                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.amber),
-                                                child: Icon(Icons.security, size: 14, color: Colors.white),
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  color: Colors.amber,
+                                                ),
+                                                child: Icon(
+                                                  Icons.security,
+                                                  size: 14,
+                                                  color: Colors.white,
+                                                ),
                                               ),
                                             ),
-                                        ]
+                                        ],
                                       ),
                                       const SizedBox(height: 6),
                                       StatBar(
@@ -1743,7 +2033,10 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
                                 duration: const Duration(milliseconds: 600),
                                 switchInCurve: Curves.easeOutBack,
                                 switchOutCurve: Curves.easeInCirc,
-                                transitionBuilder: (Widget child, Animation<double> animation) {
+                                transitionBuilder: (
+                                  Widget child,
+                                  Animation<double> animation,
+                                ) {
                                   return FadeTransition(
                                     opacity: animation,
                                     child: ScaleTransition(
@@ -1753,140 +2046,199 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
                                     ),
                                   );
                                 },
-                                child: m == null
-                                    ? const SizedBox.shrink(key: ValueKey('no_monster'))
-                                    : Column(
-                                        key: ValueKey('monster_${m.name}_${m.hp}'), // Use HP to distinguish same-name monsters if needed
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                                        children: [
-                                          const SizedBox(height: 12),
-                                          Panel(
-                                            child: Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Row(
-                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                  children: [
-                                                    Text(
-                                                      _monsterTypeEmoji(m.type),
-                                                      style: const TextStyle(fontSize: 16),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Text(
-                                                      m.name,
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 20,
-                                                        fontWeight: FontWeight.bold,
-                                                      ),
-                                                    ),
-                                                    if (_monsterBurnTicks > 0)
-                                                      const Padding(
-                                                        padding: EdgeInsets.only(left: 6),
-                                                        child: Icon(Icons.local_fire_department, size: 16, color: Colors.orange),
-                                                      ),
-                                                    if (_monsterShatterTicks > 0)
-                                                      const Padding(
-                                                        padding: EdgeInsets.only(left: 4),
-                                                        child: Icon(Icons.auto_fix_high, size: 16, color: Colors.purpleAccent),
-                                                      ),
-                                                    const SizedBox(width: 8),
-                                                    _TierStars(tier: m.tier),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 8),
-                                                _MonsterPortrait(
-                                                  imageAsset: m.imageAsset,
-                                                  hitVersion: _monsterHitVersion,
-                                                  isDying: _monsterDying,
-                                                  windUpScale: _progressTo(
-                                                            _nextMonsterHit,
-                                                            _monsterIntervalMs,
-                                                          ) >
-                                                          0.88
-                                                      ? 1.0 +
-                                                          0.04 *
-                                                              sin(
-                                                                DateTime.now()
-                                                                        .millisecondsSinceEpoch /
-                                                                    185.0,
-                                                              )
-                                                      : 1.0,
-                                                ),
-                                                const SizedBox(height: 8),
-                                                Padding(
-                                                  padding: const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                  ),
-                                                  child: _MonsterHpBar(
-                                                    current: m.hp,
-                                                    max: m.maxHp,
-                                                    damageFlashKey: _monsterHitVersion,
-                                                    showPercent: true,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 6),
-                                                Padding(
-                                                  padding: const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                  ),
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment.start,
+                                child:
+                                    m == null
+                                        ? const SizedBox.shrink(
+                                          key: ValueKey('no_monster'),
+                                        )
+                                        : Column(
+                                          key: ValueKey(
+                                            'monster_${m.name}_${m.hp}',
+                                          ), // Use HP to distinguish same-name monsters if needed
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            const SizedBox(height: 12),
+                                            Panel(
+                                              child: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Row(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
                                                     children: [
-                                                      Row(
-                                                        children: [
-                                                          const Icon(
-                                                            Icons.schedule,
-                                                            color: Colors.white70,
-                                                            size: 18,
+                                                      Text(
+                                                        _monsterTypeEmoji(
+                                                          m.type,
+                                                        ),
+                                                        style: const TextStyle(
+                                                          fontSize: 16,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      Text(
+                                                        m.name,
+                                                        style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 20,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                      if (_monsterBurnTicks > 0)
+                                                        const Padding(
+                                                          padding:
+                                                              EdgeInsets.only(
+                                                                left: 6,
+                                                              ),
+                                                          child: Icon(
+                                                            Icons
+                                                                .local_fire_department,
+                                                            size: 16,
+                                                            color:
+                                                                Colors.orange,
                                                           ),
-                                                          const SizedBox(width: 8),
-                                                          const Text(
-                                                            'Attack timing',
-                                                            style: TextStyle(
-                                                              color: Colors.white,
-                                                              fontWeight: FontWeight.w700,
-                                                              fontSize: 14,
-                                                            ),
+                                                        ),
+                                                      if (_monsterShatterTicks >
+                                                          0)
+                                                        const Padding(
+                                                          padding:
+                                                              EdgeInsets.only(
+                                                                left: 4,
+                                                              ),
+                                                          child: Icon(
+                                                            Icons.auto_fix_high,
+                                                            size: 16,
+                                                            color:
+                                                                Colors
+                                                                    .purpleAccent,
                                                           ),
-                                                        ],
-                                                      ),
-                                                      const SizedBox(height: 10),
-                                                      _AttackTimeline(
-                                                        icon: Icons.sports_martial_arts,
-                                                        title: 'Your next swing',
-                                                        progress: _progressTo(
-                                                          _nextPlayerHit,
-                                                          _playerIntervalMs,
                                                         ),
-                                                        secondsLeft: _secondsUntilNextHit(
-                                                          _nextPlayerHit,
-                                                        ),
-                                                        accent: Colors.lightGreenAccent,
-                                                      ),
-                                                      const SizedBox(height: 8),
-                                                      _AttackTimeline(
-                                                        icon: Icons.bolt,
-                                                        title: "${m.name}'s next swing",
-                                                        progress: _progressTo(
-                                                          _nextMonsterHit,
-                                                          _monsterIntervalMs,
-                                                        ),
-                                                        secondsLeft: _secondsUntilNextHit(
-                                                          _nextMonsterHit,
-                                                        ),
-                                                        accent: Colors.redAccent,
-                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      _TierStars(tier: m.tier),
                                                     ],
                                                   ),
-                                                ),
-                                              ],
+                                                  const SizedBox(height: 8),
+                                                  _MonsterPortrait(
+                                                    imageAsset: m.imageAsset,
+                                                    hitVersion:
+                                                        _monsterHitVersion,
+                                                    isDying: _monsterDying,
+                                                    windUpScale:
+                                                        _progressTo(
+                                                                  _nextMonsterHit,
+                                                                  _monsterIntervalMs,
+                                                                ) >
+                                                                0.88
+                                                            ? 1.0 +
+                                                                0.04 *
+                                                                    sin(
+                                                                      DateTime.now()
+                                                                              .millisecondsSinceEpoch /
+                                                                          185.0,
+                                                                    )
+                                                            : 1.0,
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  Padding(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 8,
+                                                        ),
+                                                    child: _MonsterHpBar(
+                                                      current: m.hp,
+                                                      max: m.maxHp,
+                                                      damageFlashKey:
+                                                          _monsterHitVersion,
+                                                      showPercent: true,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 6),
+                                                  Padding(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 8,
+                                                        ),
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Row(
+                                                          children: [
+                                                            const Icon(
+                                                              Icons.schedule,
+                                                              color:
+                                                                  Colors
+                                                                      .white70,
+                                                              size: 18,
+                                                            ),
+                                                            const SizedBox(
+                                                              width: 8,
+                                                            ),
+                                                            const Text(
+                                                              'Attack timing',
+                                                              style: TextStyle(
+                                                                color:
+                                                                    Colors
+                                                                        .white,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                                fontSize: 14,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 10,
+                                                        ),
+                                                        _AttackTimeline(
+                                                          icon:
+                                                              Icons
+                                                                  .sports_martial_arts,
+                                                          title:
+                                                              'Your next swing',
+                                                          progress: _progressTo(
+                                                            _nextPlayerHit,
+                                                            _playerIntervalMs,
+                                                          ),
+                                                          secondsLeft:
+                                                              _secondsUntilNextHit(
+                                                                _nextPlayerHit,
+                                                              ),
+                                                          accent:
+                                                              Colors
+                                                                  .lightGreenAccent,
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 8,
+                                                        ),
+                                                        _AttackTimeline(
+                                                          icon: Icons.bolt,
+                                                          title:
+                                                              "${m.name}'s next swing",
+                                                          progress: _progressTo(
+                                                            _nextMonsterHit,
+                                                            _monsterIntervalMs,
+                                                          ),
+                                                          secondsLeft:
+                                                              _secondsUntilNextHit(
+                                                                _nextMonsterHit,
+                                                              ),
+                                                          accent:
+                                                              Colors.redAccent,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                        ],
-                                      ),
+                                          ],
+                                        ),
                               );
                             },
                           ),
@@ -1910,39 +2262,62 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
                           if (_floats.isEmpty) return const SizedBox.shrink();
                           return IgnorePointer(
                             child: Stack(
-                              children: _floats.map((f) {
-                                final align = Alignment(f.xFrac * 2 - 1, f.yFrac * 2 - 1);
-                                final now = DateTime.now();
-                                final rawP = (now.difference(f.start).inMilliseconds / f.duration.inMilliseconds).clamp(0.0, 1.0);
-                                final moveP = Curves.easeOut.transform(rawP);
-                                final dy = -f.rise * moveP;
-                                final opacity = (1 - Curves.easeIn.transform(rawP)).clamp(0.0, 1.0);
-                                final punchT = (rawP / 0.2).clamp(0.0, 1.0);
-                                final punchScale = f.punch ? 1.32 - 0.32 * Curves.easeOut.transform(punchT) : 1.0;
-                                return Align(
-                                  alignment: align,
-                                  child: Opacity(
-                                    opacity: opacity,
-                                    child: Transform.translate(
-                                      offset: Offset(0, dy),
-                                      child: Transform.scale(
-                                        scale: punchScale,
-                                        child: Text(
-                                          f.text,
-                                          style: TextStyle(
-                                            color: f.color,
-                                            fontSize: f.fontSize,
-                                            fontWeight: FontWeight.w800,
-                                            shadows: const [
-                                              Shadow(blurRadius: 6, color: Colors.black87, offset: Offset(0, 2)),
-                                            ],
+                              children:
+                                  _floats.map((f) {
+                                    final align = Alignment(
+                                      f.xFrac * 2 - 1,
+                                      f.yFrac * 2 - 1,
+                                    );
+                                    final now = DateTime.now();
+                                    final rawP = (now
+                                                .difference(f.start)
+                                                .inMilliseconds /
+                                            f.duration.inMilliseconds)
+                                        .clamp(0.0, 1.0);
+                                    final moveP = Curves.easeOut.transform(
+                                      rawP,
+                                    );
+                                    final dy = -f.rise * moveP;
+                                    final opacity = (1 -
+                                            Curves.easeIn.transform(rawP))
+                                        .clamp(0.0, 1.0);
+                                    final punchT = (rawP / 0.2).clamp(0.0, 1.0);
+                                    final punchScale =
+                                        f.punch
+                                            ? 1.32 -
+                                                0.32 *
+                                                    Curves.easeOut.transform(
+                                                      punchT,
+                                                    )
+                                            : 1.0;
+                                    return Align(
+                                      alignment: align,
+                                      child: Opacity(
+                                        opacity: opacity,
+                                        child: Transform.translate(
+                                          offset: Offset(0, dy),
+                                          child: Transform.scale(
+                                            scale: punchScale,
+                                            child: Text(
+                                              f.text,
+                                              style: TextStyle(
+                                                color: f.color,
+                                                fontSize: f.fontSize,
+                                                fontWeight: FontWeight.w800,
+                                                shadows: const [
+                                                  Shadow(
+                                                    blurRadius: 6,
+                                                    color: Colors.black87,
+                                                    offset: Offset(0, 2),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
+                                    );
+                                  }).toList(),
                             ),
                           );
                         },
@@ -1952,7 +2327,11 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
                   Align(
                     alignment: Alignment.bottomCenter,
                     child: SafeArea(
-                      minimum: const EdgeInsets.only(bottom: 12, left: 12, right: 12),
+                      minimum: const EdgeInsets.only(
+                        bottom: 12,
+                        left: 12,
+                        right: 12,
+                      ),
                       child: Container(
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.6),
@@ -1968,9 +2347,19 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
                             if (gs.profile.health <= 0)
                               Row(
                                 children: [
-                                  const Expanded(child: ElevatedButton(onPressed: null, child: Text('Advance'))),
+                                  const Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: null,
+                                      child: Text('Advance'),
+                                    ),
+                                  ),
                                   const SizedBox(width: 8),
-                                  Expanded(child: OutlinedButton(onPressed: _requestLeave, child: const Text('Leave'))),
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: _requestLeave,
+                                      child: const Text('Leave'),
+                                    ),
+                                  ),
                                 ],
                               )
                             else
@@ -1981,31 +2370,65 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with TickerProvid
                                     Expanded(
                                       child: ElevatedButton.icon(
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: _monster == null
-                                              ? const Color(0xFF1A6B3C)
-                                              : Colors.grey.withValues(alpha: 0.3),
+                                          backgroundColor:
+                                              _monster == null
+                                                  ? const Color(0xFF1A6B3C)
+                                                  : Colors.grey.withValues(
+                                                    alpha: 0.3,
+                                                  ),
                                           foregroundColor: Colors.white,
-                                          disabledBackgroundColor: Colors.grey.withValues(alpha: 0.2),
-                                          disabledForegroundColor: Colors.white38,
+                                          disabledBackgroundColor: Colors.grey
+                                              .withValues(alpha: 0.2),
+                                          disabledForegroundColor:
+                                              Colors.white38,
                                         ),
-                                        onPressed: _monster == null ? () => _advance(gs) : null,
+                                        onPressed:
+                                            _monster == null
+                                                ? () => _advance(gs)
+                                                : null,
                                         icon: Icon(
-                                          _monster == null ? Icons.arrow_forward_rounded : Icons.sports_martial_arts_rounded,
+                                          _monster == null
+                                              ? Icons.arrow_forward_rounded
+                                              : Icons
+                                                  .sports_martial_arts_rounded,
                                           size: 18,
                                         ),
-                                        label: Text(_monster == null ? 'Advance' : 'Fighting...'),
+                                        label: Text(
+                                          _monster == null
+                                              ? 'Advance'
+                                              : 'Fighting...',
+                                        ),
                                       ),
                                     ),
                                     if (_monster != null) ...[
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: _ClassSkillButton(
-                                          name: gs.profile.heroClass.skill?.name ?? 'Strike',
-                                          icon: 'assets/images/icons/skills/${gs.profile.heroClass.skill?.id ?? "power_strike"}.png',
-                                          color: gs.profile.heroClass.rarityColor,
+                                          name:
+                                              gs
+                                                  .profile
+                                                  .heroClass
+                                                  .skill
+                                                  ?.name ??
+                                              'Strike',
+                                          icon:
+                                              'assets/images/icons/skills/${gs.profile.heroClass.skill?.id ?? "power_strike"}.png',
+                                          color:
+                                              gs.profile.heroClass.rarityColor,
                                           canUse: _canUseSkill(gs),
-                                          cooldownProgress: gs.getSkillCooldownProgress(gs.profile.selectedClassId),
-                                          secondsLeft: gs.getSkillSecondsRemaining(gs.profile.heroClass.skill?.id ?? ""),
+                                          cooldownProgress: gs
+                                              .getSkillCooldownProgress(
+                                                gs.profile.selectedClassId,
+                                              ),
+                                          secondsLeft: gs
+                                              .getSkillSecondsRemaining(
+                                                gs
+                                                        .profile
+                                                        .heroClass
+                                                        .skill
+                                                        ?.id ??
+                                                    "",
+                                              ),
                                           onPressed: () => _useActiveSkill(gs),
                                         ),
                                       ),
@@ -2128,7 +2551,8 @@ class _InventoryBar extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(10),
-            onTap: !hasItem ? null : () => _showItemDetails(context, label, item),
+            onTap:
+                !hasItem ? null : () => _showItemDetails(context, label, item),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               height: 94,
@@ -2139,15 +2563,16 @@ class _InventoryBar extends StatelessWidget {
                   color: color.withValues(alpha: hasItem ? 0.8 : 0.2),
                   width: hasItem ? 1.5 : 1,
                 ),
-                boxShadow: hasItem
-                    ? [
-                        BoxShadow(
-                          color: color.withValues(alpha: 0.25),
-                          blurRadius: 8,
-                          spreadRadius: 1,
-                        ),
-                      ]
-                    : null,
+                boxShadow:
+                    hasItem
+                        ? [
+                          BoxShadow(
+                            color: color.withValues(alpha: 0.25),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ]
+                        : null,
               ),
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               child: Column(
@@ -2164,17 +2589,29 @@ class _InventoryBar extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Expanded(
-                    child: !hasItem
-                        ? Icon(Icons.add_circle_outline, color: Colors.white10, size: 20)
-                        : Tooltip(
-                            message: item.stats.entries.map((e) => _statLine(e.key, e.value)).join('\n'),
-                            preferBelow: false,
-                            child: Image.asset(
-                              item.effectiveAssetPath,
-                              fit: BoxFit.contain,
-                              errorBuilder: (c, e, s) => Icon(Icons.inventory_2, color: color, size: 24),
+                    child:
+                        !hasItem
+                            ? Icon(
+                              Icons.add_circle_outline,
+                              color: Colors.white10,
+                              size: 20,
+                            )
+                            : Tooltip(
+                              message: item.stats.entries
+                                  .map((e) => _statLine(e.key, e.value))
+                                  .join('\n'),
+                              preferBelow: false,
+                              child: Image.asset(
+                                item.effectiveAssetPath,
+                                fit: BoxFit.contain,
+                                errorBuilder:
+                                    (c, e, s) => Icon(
+                                      Icons.inventory_2,
+                                      color: color,
+                                      size: 24,
+                                    ),
+                              ),
                             ),
-                          ),
                   ),
                 ],
               ),
@@ -2186,13 +2623,13 @@ class _InventoryBar extends StatelessWidget {
 
     return Row(
       children: [
-        cell('Weapon', p.journeyWeapon ?? p.weapon),
+        cell('Weapon', p.journeyWeapon),
         const SizedBox(width: 8),
-        cell('Armor', p.journeyArmor ?? p.armor),
+        cell('Armor', p.journeyArmor),
         const SizedBox(width: 8),
-        cell('Ring', p.journeyRing ?? p.ring),
+        cell('Ring', p.journeyRing),
         const SizedBox(width: 8),
-        cell('Boots', p.journeyBoots ?? p.boots),
+        cell('Boots', p.journeyBoots),
       ],
     );
   }
@@ -2220,10 +2657,7 @@ class _MonsterPortrait extends StatelessWidget {
       builder: (context, sink, child) {
         return Transform.translate(
           offset: Offset(0, sink * 100),
-          child: Opacity(
-            opacity: (1.0 - sink).clamp(0.0, 1.0),
-            child: child,
-          ),
+          child: Opacity(opacity: (1.0 - sink).clamp(0.0, 1.0), child: child),
         );
       },
       child: TweenAnimationBuilder<double>(
@@ -2232,34 +2666,45 @@ class _MonsterPortrait extends StatelessWidget {
         duration: const Duration(milliseconds: 340),
         curve: Curves.elasticOut,
         builder: (context, recoil, child) {
-          final flash = hitVersion > 0 && recoil > 1.02 ? (recoil - 1.0) * 5 : 0.0;
+          final flash =
+              hitVersion > 0 && recoil > 1.02 ? (recoil - 1.0) * 5 : 0.0;
           return Transform.scale(
             scale: (hitVersion == 0 ? 1.0 : recoil) * windUpScale,
             child: Stack(
               children: [
                 imageAsset.isNotEmpty
                     ? SizedBox(
-                        height: 110,
-                        width: 110,
-                        child: Image.asset(
-                          imageAsset,
-                          fit: BoxFit.contain,
-                          errorBuilder: (c, e, s) => const Icon(Icons.pest_control, color: Colors.white54, size: 64),
-                        ),
-                      )
-                    : const Icon(Icons.pest_control, color: Colors.white54, size: 64),
+                      height: 110,
+                      width: 110,
+                      child: Image.asset(
+                        imageAsset,
+                        fit: BoxFit.contain,
+                        errorBuilder:
+                            (c, e, s) => const Icon(
+                              Icons.pest_control,
+                              color: Colors.white54,
+                              size: 64,
+                            ),
+                      ),
+                    )
+                    : const Icon(
+                      Icons.pest_control,
+                      color: Colors.white54,
+                      size: 64,
+                    ),
                 if (flash > 0)
                   Positioned.fill(
                     child: Opacity(
                       opacity: flash.clamp(0.0, 1.0),
-                      child: imageAsset.isNotEmpty
-                          ? Image.asset(
-                              imageAsset,
-                              fit: BoxFit.contain,
-                              color: Colors.white,
-                              colorBlendMode: BlendMode.srcIn,
-                            )
-                          : Container(color: Colors.white),
+                      child:
+                          imageAsset.isNotEmpty
+                              ? Image.asset(
+                                imageAsset,
+                                fit: BoxFit.contain,
+                                color: Colors.white,
+                                colorBlendMode: BlendMode.srcIn,
+                              )
+                              : Container(color: Colors.white),
                     ),
                   ),
               ],
@@ -2291,7 +2736,8 @@ class _AttackTimeline extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = progress.clamp(0.0, 1.0);
     final striking = secondsLeft < 0.12;
-    final timeLabel = striking ? 'Striking…' : '${secondsLeft.toStringAsFixed(1)} s';
+    final timeLabel =
+        striking ? 'Striking…' : '${secondsLeft.toStringAsFixed(1)} s';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2363,10 +2809,7 @@ class _AttackTimeline extends StatelessWidget {
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
-                            colors: [
-                              accent.withValues(alpha: 0.55),
-                              accent,
-                            ],
+                            colors: [accent.withValues(alpha: 0.55), accent],
                           ),
                         ),
                         child: const SizedBox.expand(),
@@ -2419,14 +2862,16 @@ class _MonsterHpBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final pct = (current / max).clamp(0, 1).toDouble();
     // Color transitions: green > yellow > orange > red as HP drops
-    final barColor = pct > 0.6
-        ? const Color(0xFFEF5350)
-        : pct > 0.35
+    final barColor =
+        pct > 0.6
+            ? const Color(0xFFEF5350)
+            : pct > 0.35
             ? const Color(0xFFFF7043)
             : const Color(0xFFFF1744);
-    final barColorLight = pct > 0.6
-        ? const Color(0xFFEF9A9A)
-        : pct > 0.35
+    final barColorLight =
+        pct > 0.6
+            ? const Color(0xFFEF9A9A)
+            : pct > 0.35
             ? const Color(0xFFFFAB91)
             : const Color(0xFFFF616F);
 
@@ -2440,7 +2885,11 @@ class _MonsterHpBar extends StatelessWidget {
             children: [
               const Text(
                 'HP',
-                style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               Text(
                 '$current / $max  (${(pct * 100).round()}%)',
@@ -2502,9 +2951,10 @@ class _MonsterHpBar extends StatelessWidget {
                           tween: Tween(begin: 0.55, end: 0.0),
                           duration: const Duration(milliseconds: 420),
                           curve: Curves.easeOut,
-                          builder: (_, flash, __) => ColoredBox(
-                            color: Colors.white.withValues(alpha: flash),
-                          ),
+                          builder:
+                              (_, flash, __) => ColoredBox(
+                                color: Colors.white.withValues(alpha: flash),
+                              ),
                         ),
                       ),
                     ),
@@ -2609,7 +3059,7 @@ class Monster {
       'Ghost',
       'Ghost Wraith',
       'Demon',
-      'Demon Lord'
+      'Demon Lord',
     ];
     final String name = names[rnd.nextInt(names.length)];
     final type = switch (name) {
@@ -2691,7 +3141,10 @@ class Monster {
       MonsterType.demon => 'Demon',
       _ => name,
     };
-    final image = gs.pickEnemyImage(assetSearchName, difficultyIndex: imageIndex);
+    final image = gs.pickEnemyImage(
+      assetSearchName,
+      difficultyIndex: imageIndex,
+    );
 
     return Monster(
       name: name,
@@ -2713,7 +3166,7 @@ class Monster {
     // bosses are much tougher
     final scale = 1.0 + (level * 0.5);
     final base = randomForStep(gs, level * 10, rnd);
-    
+
     return Monster(
       name: 'BOSS: ${base.name}',
       type: base.type,
@@ -2777,7 +3230,11 @@ class _JourneyLogList extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             child: Row(
               children: [
-                const Icon(Icons.article_outlined, size: 13, color: Colors.white38),
+                const Icon(
+                  Icons.article_outlined,
+                  size: 13,
+                  color: Colors.white38,
+                ),
                 const SizedBox(width: 6),
                 const Text(
                   'JOURNEY LOG',
@@ -2806,8 +3263,14 @@ class _JourneyLogList extends StatelessWidget {
                 final log = logs[index];
                 final isEven = index % 2 == 0;
                 return Container(
-                  color: isEven ? Colors.white.withValues(alpha: 0.03) : Colors.transparent,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  color:
+                      isEven
+                          ? Colors.white.withValues(alpha: 0.03)
+                          : Colors.transparent,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 3,
+                  ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -2834,7 +3297,10 @@ class _JourneyLogList extends StatelessWidget {
                           style: TextStyle(
                             color: log.color,
                             fontSize: 12.5,
-                            fontWeight: log.color != Colors.white38 ? FontWeight.w600 : FontWeight.normal,
+                            fontWeight:
+                                log.color != Colors.white38
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
                             shadows: const [
                               Shadow(
                                 color: Colors.black,
@@ -2973,29 +3439,24 @@ class _ParallaxLayer extends StatelessWidget {
   final double speed;
   final Widget child;
 
-  const _ParallaxLayer({required this.offset, required this.speed, required this.child});
+  const _ParallaxLayer({
+    required this.offset,
+    required this.speed,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
     // Basic infinite wrapping for images
     // We use a larger width to ensure no gaps during fast movement
-    const double width = 2400; 
+    const double width = 2400;
     final x = -(offset * speed) % width;
-    
+
     return Stack(
       children: [
-        Positioned.fill(
-          left: x,
-          child: child,
-        ),
-        Positioned.fill(
-          left: x + width,
-          child: child,
-        ),
-        Positioned.fill(
-          left: x - width,
-          child: child,
-        ),
+        Positioned.fill(left: x, child: child),
+        Positioned.fill(left: x + width, child: child),
+        Positioned.fill(left: x - width, child: child),
       ],
     );
   }
@@ -3015,9 +3476,10 @@ class _WindParticlePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rnd = Random(42);
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: isAdvancing ? 0.25 : 0.1)
-      ..strokeWidth = 1.2;
+    final paint =
+        Paint()
+          ..color = Colors.white.withValues(alpha: isAdvancing ? 0.25 : 0.1)
+          ..strokeWidth = 1.2;
 
     final particleCount = isAdvancing ? 60 : 25;
     final speedMult = isAdvancing ? 4.0 : 1.0;
@@ -3025,18 +3487,14 @@ class _WindParticlePainter extends CustomPainter {
     for (int i = 0; i < particleCount; i++) {
       final xBase = rnd.nextDouble() * size.width;
       final y = rnd.nextDouble() * size.height;
-      
+
       // Horizontal flow based on offset and speed multiplier
       final x = (xBase - (offset * 1.5 * speedMult)) % size.width;
-      
+
       // Draw elongated speed lines during movement, dots otherwise
       if (isAdvancing) {
         final lineLen = 15.0 + rnd.nextDouble() * 25.0;
-        canvas.drawLine(
-          Offset(x, y),
-          Offset(x + lineLen, y),
-          paint,
-        );
+        canvas.drawLine(Offset(x, y), Offset(x + lineLen, y), paint);
       } else {
         canvas.drawCircle(Offset(x, y), 1.0, paint);
       }
@@ -3044,8 +3502,8 @@ class _WindParticlePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _WindParticlePainter oldDelegate) => 
-    oldDelegate.offset != offset || oldDelegate.isAdvancing != isAdvancing;
+  bool shouldRepaint(covariant _WindParticlePainter oldDelegate) =>
+      oldDelegate.offset != offset || oldDelegate.isAdvancing != isAdvancing;
 }
 
 /// Displays 1-3 star icons based on tier value for monster difficulty indication.
@@ -3055,10 +3513,16 @@ class _TierStars extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stars = (tier < 3 ? 1 : tier < 8 ? 2 : 3);
-    final color = tier < 3
-        ? Colors.white54
-        : tier < 8
+    final stars =
+        (tier < 3
+            ? 1
+            : tier < 8
+            ? 2
+            : 3);
+    final color =
+        tier < 3
+            ? Colors.white54
+            : tier < 8
             ? Colors.amber
             : Colors.orangeAccent;
     return Row(
@@ -3100,28 +3564,38 @@ class _ClassSkillButton extends StatelessWidget {
           height: 48,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            boxShadow: canUse
-                ? [
-                    BoxShadow(
-                      color: color.withValues(alpha: 0.4),
-                      blurRadius: 10,
-                      spreadRadius: 1,
-                    ),
-                  ]
-                : null,
+            boxShadow:
+                canUse
+                    ? [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.4),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                    : null,
           ),
           child: ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: canUse ? color : Colors.grey.withValues(alpha: 0.3),
+              backgroundColor:
+                  canUse ? color : Colors.grey.withValues(alpha: 0.3),
               foregroundColor: canUse ? Colors.white : Colors.white38,
               disabledBackgroundColor: Colors.grey.withValues(alpha: 0.2),
               disabledForegroundColor: Colors.white38,
               elevation: canUse ? 4 : 0,
             ),
             onPressed: canUse ? onPressed : null,
-            icon: canUse
-                ? Image.asset(icon, width: 18, height: 18, color: Colors.white, errorBuilder: (c,e,s) => const Icon(Icons.flash_on, size: 18))
-                : const Icon(Icons.hourglass_empty, size: 18),
+            icon:
+                canUse
+                    ? Image.asset(
+                      icon,
+                      width: 18,
+                      height: 18,
+                      color: Colors.white,
+                      errorBuilder:
+                          (c, e, s) => const Icon(Icons.flash_on, size: 18),
+                    )
+                    : const Icon(Icons.hourglass_empty, size: 18),
             label: Text(
               canUse ? name.toUpperCase() : '${secondsLeft}s',
               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
@@ -3164,7 +3638,10 @@ class _DefeatDialog extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFF1A0A0A),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.red.withValues(alpha: 0.4), width: 1.5),
+          border: Border.all(
+            color: Colors.red.withValues(alpha: 0.4),
+            width: 1.5,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.red.withValues(alpha: 0.25),
@@ -3183,7 +3660,10 @@ class _DefeatDialog extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.red.withValues(alpha: 0.15),
-                border: Border.all(color: Colors.red.withValues(alpha: 0.4), width: 1.5),
+                border: Border.all(
+                  color: Colors.red.withValues(alpha: 0.4),
+                  width: 1.5,
+                ),
               ),
               child: const Icon(
                 Icons.heart_broken_rounded,
@@ -3212,7 +3692,11 @@ class _DefeatDialog extends StatelessWidget {
             const SizedBox(height: 24),
             Row(
               children: [
-                const Icon(Icons.terrain_rounded, size: 14, color: Colors.white38),
+                const Icon(
+                  Icons.terrain_rounded,
+                  size: 14,
+                  color: Colors.white38,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   'Furthest reached: Step $step',

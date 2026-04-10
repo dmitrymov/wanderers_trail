@@ -127,4 +127,64 @@ class StatsSummary {
       dps: double.parse(dps.toStringAsFixed(1)),
     );
   }
+
+  /// Combined stats from both permanent Relics and temporary Journey gear.
+  static StatsSummary fromStackedItems({
+    List<Item?> permanent = const [],
+    List<Item?> journey = const [],
+  }) {
+    final allItems = [...permanent, ...journey];
+
+    double sum(ItemStatType t) {
+      double acc = 0;
+      for (final it in allItems) {
+        if (it == null) continue;
+        final v = it.stats[t];
+        if (v != null) acc += v;
+      }
+      return acc;
+    }
+
+    int weaponPower = 0;
+    for (final it in allItems) {
+      if (it?.type == ItemType.weapon) weaponPower += it!.power;
+    }
+
+    int basicDefensePower = 0;
+    for (final it in allItems) {
+      if (it?.type == ItemType.armor || it?.type == ItemType.boots) {
+        basicDefensePower += it!.power;
+      }
+    }
+
+    final attack = baseDamage + weaponPower + sum(ItemStatType.attack).round();
+    final defense = basicDefensePower + sum(ItemStatType.defense).round();
+
+    final accuracy = sum(ItemStatType.accuracy);
+    final evasion = sum(ItemStatType.evasion);
+    final critChance = sum(ItemStatType.critChance);
+    final critDamage = sum(ItemStatType.critDamage);
+
+    final baseMs = 1000;
+    final weaponMsPenalty = weaponPower * 20;
+    final agilityMsBonus = (sum(ItemStatType.agility) * 10).round();
+    final int attackMs =
+        ((baseMs - weaponMsPenalty - agilityMsBonus).clamp(400, 2000)).toInt();
+
+    final hitChance = (0.8 + accuracy).clamp(0.1, 0.98);
+    final expectedPerHit = attack * (1 + critChance.clamp(0, 0.95) * critDamage);
+    final hitsPerSecond = 1000.0 / attackMs;
+    final dps = expectedPerHit * hitChance * hitsPerSecond;
+
+    return StatsSummary(
+      attack: attack,
+      defense: defense,
+      accuracy: accuracy,
+      evasion: evasion,
+      critChance: critChance,
+      critDamage: critDamage,
+      attackMs: attackMs,
+      dps: double.parse(dps.toStringAsFixed(1)),
+    );
+  }
 }

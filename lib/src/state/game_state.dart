@@ -28,6 +28,7 @@ class GameState extends ChangeNotifier {
   // Cached stats summary (recomputed when equipped item IDs change)
   StatsSummary? _statsCache;
   String? _cacheWeaponId, _cacheArmorId, _cacheRingId, _cacheBootsId;
+  String? _cacheJourneyWeaponId, _cacheJourneyArmorId, _cacheJourneyRingId, _cacheJourneyBootsId;
   String? _cachePetId;
   int _cachePermAttackLevel = -1, _cachePermDefenseLevel = -1;
 
@@ -446,7 +447,7 @@ class GameState extends ChangeNotifier {
   }
 
   /// Triggered after defeating a boss
-  void rewardBossDefeat(int level) {
+  Item rewardBossDefeat(int level) {
     // Reward: Diamonds + 1 Key
     addDiamonds(50 + (level * 10)); 
     addKeys(1);
@@ -455,9 +456,35 @@ class GameState extends ChangeNotifier {
     if (level >= profile.highestUnlockedLevel) {
       _profile = profile.copyWith(highestUnlockedLevel: level + 1);
     }
+
+    // Generate Boss Relic
+    final rarity = _rollRarityForBoss();
+    Item it = Item.heroicDrop(rarity: rarity, idGen: () => _uuid.v4());
+
+    // Add to collection
+    final newList = List<Item>.from(profile.relics)..add(it);
+    _profile = profile.copyWith(relics: newList);
+
+    // Auto-equip only if the current slot is empty
+    switch (it.type) {
+      case ItemType.weapon:
+        if (profile.weapon == null) _profile = profile.copyWith(weapon: it);
+        break;
+      case ItemType.armor:
+        if (profile.armor == null) _profile = profile.copyWith(armor: it);
+        break;
+      case ItemType.ring:
+        if (profile.ring == null) _profile = profile.copyWith(ring: it);
+        break;
+      case ItemType.boots:
+        if (profile.boots == null) _profile = profile.copyWith(boots: it);
+        break;
+    }
     
+    _invalidateStatsCache();
     notifyListeners();
     _persist();
+    return it;
   }
 
   /// Reward logic for endless mode steps
@@ -669,6 +696,15 @@ class GameState extends ChangeNotifier {
     return ItemRarity.mystic;
   }
 
+  ItemRarity _rollRarityForBoss() {
+    final rnd = Random();
+    final roll = rnd.nextInt(100);
+    // Bosses drop Rare or better
+    if (roll < 40) return ItemRarity.rare;
+    if (roll < 90) return ItemRarity.legendary;
+    return ItemRarity.mystic;
+  }
+
   void clearPermanentEquipment() {
     _profile = profile.copyWith(
       weapon: null,
@@ -734,13 +770,22 @@ class GameState extends ChangeNotifier {
     Item? ring,
     Item? boots,
     Pet? petForBonuses,
+    bool includeRelics = true,
   }) {
-    final base = StatsSummary.fromItems(
-      weapon: weapon,
-      armor: armor,
-      ring: ring,
-      boots: boots,
-    );
+    StatsSummary base;
+    if (includeRelics) {
+      base = StatsSummary.fromStackedItems(
+        permanent: [profile.weapon, profile.armor, profile.ring, profile.boots],
+        journey: [weapon, armor, ring, boots],
+      );
+    } else {
+      base = StatsSummary.fromItems(
+        weapon: weapon,
+        armor: armor,
+        ring: ring,
+        boots: boots,
+      );
+    }
     final withPerm = StatsSummary.withBonuses(
       base,
       attackBonus: permAttackLevel * permAttackStep,
@@ -960,32 +1005,34 @@ class GameState extends ChangeNotifier {
   }
 
   StatsSummary get statsSummary {
-    // If a journey item exists, it overrides the home (permanent) item for this run.
-    final curW = profile.journeyWeapon ?? profile.weapon;
-    final curA = profile.journeyArmor ?? profile.armor;
-    final curR = profile.journeyRing ?? profile.ring;
-    final curB = profile.journeyBoots ?? profile.boots;
+    final pW = profile.weapon;
+    final pA = profile.armor;
+    final pR = profile.ring;
+    final pB = profile.boots;
 
-    final w = curW?.id;
-    final a = curA?.id;
-    final r = curR?.id;
-    final b = curB?.id;
+    final jW = profile.journeyWeapon;
+    final jA = profile.journeyArmor;
+    final jR = profile.journeyRing;
+    final jB = profile.journeyBoots;
+
     final petId = profile.selectedPetId;
-    final dirty =
-        _statsCache == null ||
-        w != _cacheWeaponId ||
-        a != _cacheArmorId ||
-        r != _cacheRingId ||
-        b != _cacheBootsId ||
+    final dirty = _statsCache == null ||
+        pW?.id != _cacheWeaponId ||
+        pA?.id != _cacheArmorId ||
+        pR?.id != _cacheRingId ||
+        pB?.id != _cacheBootsId ||
+        jW?.id != _cacheJourneyWeaponId ||
+        jA?.id != _cacheJourneyArmorId ||
+        jR?.id != _cacheJourneyRingId ||
+        jB?.id != _cacheJourneyBootsId ||
         petId != _cachePetId ||
         _cachePermAttackLevel != permAttackLevel ||
         _cachePermDefenseLevel != permDefenseLevel;
+
     if (dirty) {
-      final base = StatsSummary.fromItems(
-        weapon: curW,
-        armor: curA,
-        ring: curR,
-        boots: curB,
+      final base = StatsSummary.fromStackedItems(
+        permanent: [pW, pA, pR, pB],
+        journey: [jW, jA, jR, jB],
       );
       final withPerm = StatsSummary.withBonuses(
         base,
@@ -1033,10 +1080,14 @@ class GameState extends ChangeNotifier {
       } else {
         _statsCache = withPet;
       }
-      _cacheWeaponId = w;
-      _cacheArmorId = a;
-      _cacheRingId = r;
-      _cacheBootsId = b;
+      _cacheWeaponId = pW?.id;
+      _cacheArmorId = pA?.id;
+      _cacheRingId = pR?.id;
+      _cacheBootsId = pB?.id;
+      _cacheJourneyWeaponId = jW?.id;
+      _cacheJourneyArmorId = jA?.id;
+      _cacheJourneyRingId = jR?.id;
+      _cacheJourneyBootsId = jB?.id;
       _cachePetId = petId;
       _cachePermAttackLevel = permAttackLevel;
       _cachePermDefenseLevel = permDefenseLevel;

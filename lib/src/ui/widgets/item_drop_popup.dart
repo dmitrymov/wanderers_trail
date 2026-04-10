@@ -128,16 +128,18 @@ class ItemDropPopup extends StatelessWidget {
 
     // Current and candidate summaries
     final current = gs.computeStats(
-      weapon: p.weapon,
-      armor: p.armor,
-      ring: p.ring,
-      boots: p.boots,
+      weapon: p.journeyWeapon,
+      armor: p.journeyArmor,
+      ring: p.journeyRing,
+      boots: p.journeyBoots,
+      includeRelics: true,
     );
     final cand = gs.computeStats(
-      weapon: item.type == ItemType.weapon ? item : p.weapon,
-      armor: item.type == ItemType.armor ? item : p.armor,
-      ring: item.type == ItemType.ring ? item : p.ring,
-      boots: item.type == ItemType.boots ? item : p.boots,
+      weapon: item.type == ItemType.weapon ? item : p.journeyWeapon,
+      armor: item.type == ItemType.armor ? item : p.journeyArmor,
+      ring: item.type == ItemType.ring ? item : p.journeyRing,
+      boots: item.type == ItemType.boots ? item : p.journeyBoots,
+      includeRelics: true,
     );
 
     return AlertDialog(
