@@ -11,6 +11,8 @@ class JourneyLevelConfig {
   final Color? backgroundTint;
   final List<MonsterType> allowedMonsters;
   final Color themeColor;
+  /// Base difficulty offset applied to steps in this region
+  final int difficultyOffset;
 
   const JourneyLevelConfig({
     required this.levelId,
@@ -20,6 +22,7 @@ class JourneyLevelConfig {
     this.backgroundTint,
     required this.allowedMonsters,
     required this.themeColor,
+    required this.difficultyOffset,
   });
 
   // ── Curated levels ──────────────────────────────────────────────────────────
@@ -33,6 +36,7 @@ class JourneyLevelConfig {
       backgroundAsset: 'assets/images/backgrounds/battle_bg.png',
       allowedMonsters: [MonsterType.slime, MonsterType.wolf],
       themeColor: Colors.lightGreen,
+      difficultyOffset: 0,
     ),
     JourneyLevelConfig(
       levelId: 2,
@@ -42,6 +46,7 @@ class JourneyLevelConfig {
       backgroundAsset: 'assets/images/backgrounds/battle_bg1.png',
       allowedMonsters: [MonsterType.bandit, MonsterType.spider],
       themeColor: Colors.orange,
+      difficultyOffset: 15,
     ),
     JourneyLevelConfig(
       levelId: 3,
@@ -51,6 +56,7 @@ class JourneyLevelConfig {
       backgroundTint: Color(0x4A6A0DAD), // purple tint
       allowedMonsters: [MonsterType.skeleton, MonsterType.orc, MonsterType.ghost],
       themeColor: Colors.deepPurple,
+      difficultyOffset: 35,
     ),
     JourneyLevelConfig(
       levelId: 4,
@@ -60,6 +66,7 @@ class JourneyLevelConfig {
       backgroundTint: Color(0x55CC0000), // red tint
       allowedMonsters: [MonsterType.demon, MonsterType.skeleton, MonsterType.ghost],
       themeColor: Colors.redAccent,
+      difficultyOffset: 60,
     ),
     JourneyLevelConfig(
       levelId: 5,
@@ -70,6 +77,7 @@ class JourneyLevelConfig {
       backgroundTint: Color(0x66FF4500), // deep orange tint
       allowedMonsters: [MonsterType.demon, MonsterType.ghost, MonsterType.orc],
       themeColor: Color(0xFFFF4500),
+      difficultyOffset: 90,
     ),
     JourneyLevelConfig(
       levelId: 6,
@@ -80,6 +88,7 @@ class JourneyLevelConfig {
       backgroundTint: Color(0x551A0030), // deep indigo tint
       allowedMonsters: [MonsterType.demon, MonsterType.ghost, MonsterType.skeleton, MonsterType.orc],
       themeColor: Color(0xFF4A148C),
+      difficultyOffset: 125,
     ),
     JourneyLevelConfig(
       levelId: 7,
@@ -90,6 +99,7 @@ class JourneyLevelConfig {
       backgroundTint: Color(0x440000CC), // blue-dark tint
       allowedMonsters: MonsterType.values, // all types
       themeColor: Color(0xFF0D47A1),
+      difficultyOffset: 165,
     ),
     JourneyLevelConfig(
       levelId: 8,
@@ -100,6 +110,7 @@ class JourneyLevelConfig {
       backgroundTint: Color(0x77000000), // near-black tint
       allowedMonsters: MonsterType.values, // all types
       themeColor: Color(0xFF212121),
+      difficultyOffset: 210,
     ),
   ];
 
@@ -125,6 +136,7 @@ class JourneyLevelConfig {
       backgroundTint: const Color(0x66000000),
       allowedMonsters: MonsterType.values,
       themeColor: Colors.blueGrey,
+      difficultyOffset: 210 + (id - 8) * 50,
     );
   }
 

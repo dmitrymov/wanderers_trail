@@ -244,8 +244,7 @@ class _JourneyTabState extends State<JourneyTab> {
                   child: Builder(builder: (context) {
                     // Show all curated levels + one more unlockable beyond the player's current max
                     final highestUnlocked = gs.profile.highestUnlockedLevel;
-                    final displayCount = (highestUnlocked + 1)
-                        .clamp(JourneyLevelConfig.allLevels.length, highestUnlocked + 1);
+                    final displayCount = max(JourneyLevelConfig.allLevels.length, highestUnlocked + 1);
                     return ListView.builder(
                       scrollDirection: Axis.horizontal,
                       itemCount: displayCount,
@@ -1154,7 +1153,8 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage>
             _onMonsterAttackResolved(0);
             return;
           }
-          int raw = 2 + (_step ~/ 5) + _rnd.nextInt(3);
+          final monsterDamage = _monster!.baseDamage;
+          int raw = monsterDamage + _rnd.nextInt(3);
           if (_monster!.type == MonsterType.slime) {
             // Higher tier slimes hit harder (less reduction)
             final base = gs.cfgNum(['slime', 'damage_factor', 'base'], 0.7);
@@ -1496,9 +1496,15 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage>
 
   int _reduceByDefense(int raw, int defense) {
     if (defense <= 0) return max(1, raw);
-    final dr = defense / (defense + 50.0); // diminishing returns
+    final constant = context.read<GameState>().cfgNum(['global', 'defense_constant'], 100.0);
+    final dr = defense / (defense + constant); // gradual diminishing returns
+    
+    // Minimum damage floor: ensures even high-armor units take some damage
+    final minDmgPct = context.read<GameState>().cfgNum(['global', 'min_damage_percent'], 0.05);
+    final floor = (raw * minDmgPct).ceil();
+    
     final reduced = (raw * (1 - dr)).round();
-    return max(1, reduced);
+    return max(floor, reduced);
   }
 
   void _applyPoison({
@@ -3061,6 +3067,7 @@ class Monster {
   final double evasion; // 0..1 chance to avoid being hit
   final String imageAsset; // enemy image asset path
   final bool isBoss;
+  final int baseDamage;
   const Monster({
     required this.name,
     required this.type,
@@ -3072,6 +3079,7 @@ class Monster {
     required this.accuracy,
     required this.evasion,
     required this.imageAsset,
+    required this.baseDamage,
     this.isBoss = false,
   });
 
@@ -3086,26 +3094,41 @@ class Monster {
     accuracy: accuracy,
     evasion: evasion,
     imageAsset: imageAsset,
+    baseDamage: baseDamage,
     isBoss: isBoss,
   );
 
   static Monster randomForStep(GameState gs, int step, Random rnd, {int? levelId}) {
-    final maxHp = 12 + (step ~/ 5);
-    // Base 1000ms, adjust +/- up to 200ms, slightly faster as step increases
+    final levelCfg = levelId != null ? JourneyLevelConfig.getLevel(levelId) : null;
+    final int effectiveStep = step + (levelCfg?.difficultyOffset ?? 0);
+
+    final hpBase = gs.cfgNum(['global', 'hp_base'], 12.0);
+    final hpPerStep = gs.cfgNum(['global', 'hp_per_step'], 0.2);
+    final maxHp = (hpBase + (effectiveStep * hpPerStep)).round();
+
+    // Base 1000ms, faster as step increases
     final variance = rnd.nextInt(401) - 200; // -200..+200
-    final faster = (step ~/ 15) * 50; // -0, -50, -100...
+    final faster = (effectiveStep ~/ 15) * 50; 
     int ms = (1000 + variance - faster).clamp(500, 2000);
 
-    // Defense scales slowly
-    final defense = (2 + (step ~/ 6) + rnd.nextInt(3));
-    // Accuracy scales slightly with progress and variance
-    final accBase = 0.70 + (step * 0.004).clamp(0, 0.2);
-    final accVar = (rnd.nextDouble() - 0.5) * 0.1; // +/-0.05
-    final accuracy = (accBase + accVar).clamp(0.4, 0.95);
+    // Defense scaling
+    final defBase = gs.cfgNum(['global', 'def_base'], 2.0);
+    final defPerStep = gs.cfgNum(['global', 'def_per_step'], 0.16);
+    final defense = (defBase + (effectiveStep * defPerStep) + rnd.nextInt(3)).round();
+
+    // Damage scaling
+    final dmgBase = gs.cfgNum(['global', 'dmg_base'], 2.0);
+    final dmgPerStep = gs.cfgNum(['global', 'dmg_per_step'], 0.2);
+    final enemyBaseDmg = (dmgBase + (effectiveStep * dmgPerStep)).round();
+
+    // Accuracy scaling
+    final accBase = 0.70 + (effectiveStep * 0.003).clamp(0, 0.25);
+    final accVar = (rnd.nextDouble() - 0.5) * 0.1;
+    final accuracy = (accBase + accVar).clamp(0.4, 0.98);
 
     var allowedTypes = MonsterType.values;
-    if (levelId != null) {
-      allowedTypes = JourneyLevelConfig.getLevel(levelId).allowedMonsters;
+    if (levelCfg != null) {
+      allowedTypes = levelCfg.allowedMonsters;
     }
 
     final possibleNames = <String>[];
@@ -3141,20 +3164,23 @@ class Monster {
     int msSpeedBonus = 0;
     double accBonus = 0.0;
     double evaBonus = 0.0;
+    double dmgMul = 1.0;
 
     switch (type) {
       case MonsterType.wolf:
         msSpeedBonus = 300;
+        dmgMul = 0.85; // Faster but slightly weaker hits
         break;
       case MonsterType.skeleton:
         hpMul = 0.8;
-        defAdd = 5.0 + (step ~/ 12);
+        defAdd = 5.0 + (effectiveStep ~/ 12);
         msSpeedBonus = -200; // Slow but armored
         break;
       case MonsterType.orc:
-        hpMul = 1.4 + (step * 0.005);
+        hpMul = 1.4 + (effectiveStep * 0.005);
         defAdd = 2.0;
         msSpeedBonus = -100; // Tanky bruiser
+        dmgMul = 1.25;
         break;
       case MonsterType.ghost:
         hpMul = 0.6;
@@ -3163,8 +3189,9 @@ class Monster {
         evaBonus = gs.cfgNum(['ghost', 'evasion', 'base_rate'], 0.15);
         break;
       case MonsterType.demon:
-        hpMul = 1.2;
+        hpMul = 1.25;
         accBonus = 0.1;
+        dmgMul = 1.35;
         msSpeedBonus = 350; // Elite threat
         break;
       default:
@@ -3177,6 +3204,7 @@ class Monster {
     final int finalDefense = (defense + defAdd).toInt();
     final double finalAccuracy = (accuracy + accBonus).clamp(0.4, 0.98);
     final double finalEvasion = evaBonus.clamp(0.0, 0.6);
+    final int finalBaseDmg = (enemyBaseDmg * dmgMul).round();
 
     // Difficulty index derived from monster stats (not step)
     final hpDiv = gs.cfgNum(['score_weights', 'hp_div'], 50.0);
@@ -3189,12 +3217,11 @@ class Monster {
         (finalDefense / defDiv) +
         ((1200 - finalAttackMs) / spdDiv) +
         ((finalAccuracy - accBias) * accWeight);
-    // Keep combat tier behavior derived from stats as before
-    final int tierIndex =
-        max(0, min(999, score.isNaN ? 0 : score.floor())).toInt();
-    // Image variant based on checkpoints of 50 steps: 0.. for [0-49]=0, [50-99]=1, etc.
-    final int imageIndex = (step ~/ 50);
-    // Use existing icons as placeholders for new types
+    
+    final int tierIndex = max(0, min(999, score.isNaN ? 0 : score.floor())).toInt();
+    // Image variant based on checkpoints: uses effectiveStep for visual progression
+    final int imageIndex = (effectiveStep ~/ 50);
+    
     final String assetSearchName = switch (type) {
       MonsterType.skeleton => 'Skeleton',
       MonsterType.orc => 'Orc',
@@ -3218,6 +3245,7 @@ class Monster {
       accuracy: finalAccuracy,
       evasion: finalEvasion,
       imageAsset: image,
+      baseDamage: finalBaseDmg,
       isBoss: false,
     );
   }
@@ -3225,20 +3253,21 @@ class Monster {
   static Monster bossForLevel(GameState gs, int? level, Random rnd) {
     if (level == null) return randomForStep(gs, 100, rnd);
     // bosses are much tougher
-    final scale = 1.0 + (level * 0.5);
-    final base = randomForStep(gs, level * 10, rnd, levelId: level);
+    final scale = 1.0 + (level * 0.45);
+    final base = randomForStep(gs, 10, rnd, levelId: level);
 
     return Monster(
       name: 'BOSS: ${base.name}',
       type: base.type,
       tier: base.tier + 5,
-      hp: (base.maxHp * 5 * scale).toInt(),
-      maxHp: (base.maxHp * 5 * scale).toInt(),
-      attackMs: (base.attackMs * 0.8).round().clamp(300, 2000),
-      defense: (base.defense * 2 * scale).toInt(),
-      accuracy: (base.accuracy + 0.1).clamp(0, 0.99),
-      evasion: (base.evasion + 0.05).clamp(0, 0.8),
+      hp: (base.maxHp * 6 * scale).toInt(),
+      maxHp: (base.maxHp * 6 * scale).toInt(),
+      attackMs: (base.attackMs * 0.75).round().clamp(300, 2000),
+      defense: (base.defense * 2.2 * scale).toInt(),
+      accuracy: (base.accuracy + 0.12).clamp(0, 0.99),
+      evasion: (base.evasion + 0.08).clamp(0, 0.8),
       imageAsset: base.imageAsset,
+      baseDamage: (base.baseDamage * 1.8 * scale).round(),
       isBoss: true,
     );
   }
