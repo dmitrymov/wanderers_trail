@@ -27,7 +27,7 @@ class ItemDropPopup extends StatelessWidget {
         return Colors.blue;
       case ItemRarity.legendary:
         return const Color(0xFFFFD700); // gold
-      case ItemRarity.mystic:
+      case ItemRarity.mythic:
         return Colors.redAccent;
     }
   }

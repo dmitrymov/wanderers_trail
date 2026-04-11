@@ -193,7 +193,7 @@ class _ChestSection extends StatelessWidget {
         const SizedBox(height: 12),
         _ChestCard(
           title: 'Epic Chest',
-          subtitle: 'Higher chance for Legendary or Mystic gear.',
+          subtitle: 'Higher chance for Legendary or Mythic gear.',
           icon: Icons.auto_awesome_motion_rounded,
           iconColor: Colors.deepPurpleAccent,
           diamondCost: 150,

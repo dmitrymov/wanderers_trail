@@ -6,6 +6,7 @@ import '../data/models/item.dart';
 import '../data/models/pet.dart';
 import '../data/models/player_profile.dart';
 import '../data/models/hero_class.dart';
+import '../data/models/journey_event.dart'; // added journey_event
 import '../data/repositories/game_repository.dart';
 import '../core/stats.dart';
 import 'package:flutter/foundation.dart';
@@ -249,6 +250,8 @@ class GameState extends ChangeNotifier {
     highScore: 0,
     highestUnlockedLevel: 1,
     equipmentKeys: 0,
+    xp: 0,
+    playerLevel: 1,
     maxHealth: 100,
     maxStamina: 100,
     healthUpgrades: 0,
@@ -337,9 +340,9 @@ class GameState extends ChangeNotifier {
   Pet? get selectedPet {
     final id = profile.selectedPetId;
     if (id == null) return null;
-    return Pet.starterPets().firstWhere(
+    return Pet.allPets().firstWhere(
       (p) => p.id == id,
-      orElse: () => Pet.starterPets().first,
+      orElse: () => Pet.allPets().first,
     );
   }
 
@@ -581,6 +584,42 @@ class GameState extends ChangeNotifier {
     _persist();
   }
 
+  void addXp(int amount) {
+    if (amount <= 0) return;
+    int newXp = profile.xp + amount;
+    int currentLevel = profile.playerLevel;
+    int xpNeeded = currentLevel * 100;
+    
+    bool leveledUp = false;
+    int newPermHealthLevel = profile.permHealthLevel;
+    int newPermAttackLevel = profile.permAttackLevel;
+
+    while (newXp >= xpNeeded) {
+      newXp -= xpNeeded;
+      currentLevel++;
+      leveledUp = true;
+      xpNeeded = currentLevel * 100;
+      // Award passive stats on base level up
+      newPermHealthLevel++;
+      if (currentLevel % 2 == 0) newPermAttackLevel++;
+    }
+
+    _profile = profile.copyWith(
+      xp: newXp,
+      playerLevel: currentLevel,
+      permHealthLevel: newPermHealthLevel,
+      permAttackLevel: newPermAttackLevel,
+    );
+    
+    if (leveledUp) {
+      OverlayService.showToast('Level Up! Now Level $currentLevel. Stats increased!');
+      _invalidateStatsCache();
+    }
+    
+    notifyListeners();
+    _persist();
+  }
+
   void addDiamonds(int amount) {
     _profile = profile.copyWith(diamonds: max(0, profile.diamonds + amount));
     notifyListeners();
@@ -639,7 +678,7 @@ class GameState extends ChangeNotifier {
 
     // Roll item logic:
     // Regular chest: Score 40 (Uncommon/Rare/Legendary bias)
-    // Epic chest: Score 120 (Rare/Legendary/Mystic bias)
+    // Epic chest: Score 120 (Rare/Legendary/Mythic bias)
     final rarity = isEpic ? _rollRarityForEpic() : _rollRarityForRegular();
     Item it = Item.heroicDrop(rarity: rarity, idGen: () => _uuid.v4());
 
@@ -693,7 +732,7 @@ class GameState extends ChangeNotifier {
     final roll = rnd.nextInt(100);
     if (roll < 40) return ItemRarity.rare;
     if (roll < 85) return ItemRarity.legendary;
-    return ItemRarity.mystic;
+    return ItemRarity.mythic;
   }
 
   ItemRarity _rollRarityForBoss() {
@@ -702,7 +741,7 @@ class GameState extends ChangeNotifier {
     // Bosses drop Rare or better
     if (roll < 40) return ItemRarity.rare;
     if (roll < 90) return ItemRarity.legendary;
-    return ItemRarity.mystic;
+    return ItemRarity.mythic;
   }
 
   void clearPermanentEquipment() {
@@ -920,7 +959,7 @@ class GameState extends ChangeNotifier {
       ItemRarity.uncommon => '1',
       ItemRarity.rare => '2',
       ItemRarity.legendary => '3',
-      ItemRarity.mystic => '4',
+      ItemRarity.mythic => '4',
     };
     // Match files that contain '_<rarityDigit><number>.png'
     final reg = RegExp(

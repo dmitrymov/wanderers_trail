@@ -10,6 +10,8 @@ class PlayerProfile {
   final int highScore;
   final int highestUnlockedLevel;
   final int equipmentKeys;
+  final int xp;
+  final int playerLevel;
 
   // Run-limited maximums (reset on New Run / Resume Checkpoint)
   final int maxHealth;
@@ -54,6 +56,8 @@ class PlayerProfile {
     required this.highScore,
     required this.highestUnlockedLevel,
     required this.equipmentKeys,
+    required this.xp,
+    required this.playerLevel,
     required this.maxHealth,
     required this.maxStamina,
     required this.healthUpgrades,
@@ -92,6 +96,8 @@ class PlayerProfile {
     int? highScore,
     int? highestUnlockedLevel,
     int? equipmentKeys,
+    int? xp,
+    int? playerLevel,
     int? maxHealth,
     int? maxStamina,
     int? healthUpgrades,
@@ -126,6 +132,8 @@ class PlayerProfile {
         highScore: highScore ?? this.highScore,
         highestUnlockedLevel: highestUnlockedLevel ?? this.highestUnlockedLevel,
         equipmentKeys: equipmentKeys ?? this.equipmentKeys,
+        xp: xp ?? this.xp,
+        playerLevel: playerLevel ?? this.playerLevel,
         maxHealth: maxHealth ?? this.maxHealth,
         maxStamina: maxStamina ?? this.maxStamina,
         healthUpgrades: healthUpgrades ?? this.healthUpgrades,
@@ -162,6 +170,8 @@ class PlayerProfile {
         'highScore': highScore,
         'highestUnlockedLevel': highestUnlockedLevel,
         'equipmentKeys': equipmentKeys,
+        'xp': xp,
+        'playerLevel': playerLevel,
         'maxHealth': maxHealth,
         'maxStamina': maxStamina,
         'healthUpgrades': healthUpgrades,
@@ -198,6 +208,8 @@ class PlayerProfile {
         highScore: (json['highScore'] as num).toInt(),
         highestUnlockedLevel: (json['highestUnlockedLevel'] as num?)?.toInt() ?? 1,
         equipmentKeys: (json['equipmentKeys'] as num?)?.toInt() ?? 0,
+        xp: (json['xp'] as num?)?.toInt() ?? 0,
+        playerLevel: (json['playerLevel'] as num?)?.toInt() ?? 1,
         maxHealth: (json['maxHealth'] as num?)?.toInt() ?? (json['health'] as num).toInt(),
         maxStamina: (json['maxStamina'] as num?)?.toInt() ?? (json['stamina'] as num).toInt(),
         healthUpgrades: (json['healthUpgrades'] as num?)?.toInt() ?? 0,
@@ -236,6 +248,8 @@ class PlayerProfile {
         highScore: 0,
         highestUnlockedLevel: 1,
         equipmentKeys: 0,
+        xp: 0,
+        playerLevel: 1,
         maxHealth: 100,
         maxStamina: 100,
         healthUpgrades: 0,

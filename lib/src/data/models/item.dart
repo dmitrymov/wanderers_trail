@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 enum ItemType { weapon, armor, ring, boots }
 
-enum ItemRarity { normal, uncommon, rare, legendary, mystic }
+enum ItemRarity { normal, uncommon, rare, legendary, mythic }
 
 enum ItemStatType {
   attack, // weapon base
@@ -69,7 +69,7 @@ class Item {
         return Color(0xFF2196F3); // Blue
       case ItemRarity.legendary:
         return Color(0xFFFFD700); // Gold
-      case ItemRarity.mystic:
+      case ItemRarity.mythic:
         return Color(0xFFFF5252); // Red
     }
   }
@@ -226,7 +226,7 @@ class Item {
           'staff' => 'Archmage Pillar',
           _ => baseName,
         };
-      } else if (rarity == ItemRarity.mystic) {
+      } else if (rarity == ItemRarity.mythic) {
         baseName = switch (category) {
           'dagger' => 'Astral Shard',
           'sword' => 'Celestial Blade',
@@ -238,8 +238,8 @@ class Item {
         };
       }
     } else {
-      // Non-weapon Mystic names
-      if (rarity == ItemRarity.mystic) {
+      // Non-weapon Mythic names
+      if (rarity == ItemRarity.mythic) {
         baseName = switch (type) {
           ItemType.armor => 'Aegis of Light',
           ItemType.ring => 'Omega Band',
@@ -289,7 +289,7 @@ class Item {
       ItemRarity.uncommon => 8,
       ItemRarity.rare => 12,
       ItemRarity.legendary => 20,
-      ItemRarity.mystic => 35,
+      ItemRarity.mythic => 35,
     };
 
     String name;
@@ -337,7 +337,7 @@ class Item {
       ItemRarity.uncommon => 'Ancient ',
       ItemRarity.rare => 'Sovereign ',
       ItemRarity.legendary => 'Eternal ',
-      ItemRarity.mystic => 'Ancestral ',
+      ItemRarity.mythic => 'Ancestral ',
     };
 
     final stats = _rollAdditionalStats(
@@ -369,7 +369,7 @@ class Item {
         return '2';
       case ItemRarity.legendary:
         return '3';
-      case ItemRarity.mystic:
+      case ItemRarity.mythic:
         return '4';
     }
   }
@@ -404,7 +404,7 @@ class Item {
       ItemRarity.uncommon => '1',
       ItemRarity.rare => '2',
       ItemRarity.legendary => '3',
-      ItemRarity.mystic => '3', // Fallback to 3 since 4 doesn't exist yet
+      ItemRarity.mythic => '3', // Fallback to 3 since 4 doesn't exist yet
     };
 
     // For non-dagger weapons, safe-guard them based on known assets
@@ -457,7 +457,7 @@ class Item {
     if (p < 0.85) return ItemRarity.uncommon;
     if (p < 0.96) return ItemRarity.rare;
     if (p < 0.995) return ItemRarity.legendary;
-    return ItemRarity.mystic;
+    return ItemRarity.mythic;
   }
 
   static Map<ItemStatType, double> _rollAdditionalStats(
@@ -471,7 +471,7 @@ class Item {
       ItemRarity.uncommon => 1,
       ItemRarity.rare => 2,
       ItemRarity.legendary => 3,
-      ItemRarity.mystic => 4,
+      ItemRarity.mythic => 4,
     };
     final pool = _statPoolFor(type);
     final stats = <ItemStatType, double>{};
@@ -572,7 +572,7 @@ class Item {
       ItemRarity.uncommon => 1.15,
       ItemRarity.rare => 1.35,
       ItemRarity.legendary => 1.65,
-      ItemRarity.mystic => 2.25,
+      ItemRarity.mythic => 2.25,
     };
     final v = baseMin + rnd.nextDouble() * (baseMax - baseMin);
     return double.parse((v * rarityMul * scale).toStringAsFixed(2));
@@ -588,14 +588,14 @@ class Item {
         return 'Rare ';
       case ItemRarity.legendary:
         return 'Legendary ';
-      case ItemRarity.mystic:
-        return 'Mystic ';
+      case ItemRarity.mythic:
+        return 'Mythic ';
     }
   }
 
   // Adds specific flavor text for high-rarity items
   static String? flavorText(ItemRarity r, Random rnd) {
-    if (r == ItemRarity.mystic) {
+    if (r == ItemRarity.mythic) {
       final flavors = [
         'A shimmering artifact from beyond the stars.',
         'It hums with a power that bends the very air around it.',

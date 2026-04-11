@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../state/game_state.dart';
 import '../../data/models/item.dart';
 import '../../data/models/item_display_helpers.dart';
+import '../../data/models/journey_event.dart';
 
 import '../theme/tokens.dart';
 import '../widgets/item_drop_popup.dart';
@@ -530,6 +531,7 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage>
 
   int _step = 0;
   Monster? _monster;
+  JourneyEvent? _currentEvent;
   late final Random _rnd;
   GameState? _gsRef; // provider reference cached for use in dispose
 
@@ -896,13 +898,11 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage>
         // BOSS TIME
         _monster = Monster.bossForLevel(gs, level, _rnd);
         _startCombat(gs);
+      } else if (_rnd.nextDouble() < 0.10) {
+        _triggerEvent(gs);
       } else if (_rnd.nextDouble() < 0.35) {
         _monster = Monster.randomForStep(gs, _step, _rnd, levelId: level);
         _startCombat(gs);
-      } else if (_rnd.nextDouble() < 0.10) {
-        var restorePoints = 10 + (_step ~/ 10);
-        gs.loseHealth(-restorePoints);
-        OverlayService.showToast('Restored $restorePoints health!');
       }
     });
     // Update best step and autosave/checkpoint
@@ -1560,6 +1560,9 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage>
       gs.addCoins(coins);
     }
 
+    final xpGain = max(10, _monster!.maxHp * 2);
+    gs.addXp(xpGain);
+
     final drop = gs.maybeDrop(runScore: _step);
 
     if (isBoss) {
@@ -1698,6 +1701,110 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage>
               Navigator.of(context).pop(); // leave battle page
             },
           ),
+    );
+  }
+
+  void _triggerEvent(GameState gs) {
+    final events = [
+      JourneyEvent(
+        title: "Abandoned Camp",
+        description: "You find a smoldering campfire and some discarded supplies.",
+        choices: [
+          EventChoice(label: "Search for loot", onChosen: () {
+            if (_rnd.nextDouble() < 0.5) {
+              gs.addCoins(10);
+              OverlayService.showToast("+10 Coins!");
+            } else {
+              gs.loseHealth(5);
+              OverlayService.showToast("It was a trap! -5 HP");
+              if (gs.profile.health <= 0) _handleDefeat();
+            }
+            _clearEvent();
+          }),
+          EventChoice(label: "Rest", onChosen: () {
+            gs.gainHealth(10);
+            OverlayService.showToast("+10 HP");
+            _clearEvent();
+          }),
+        ]
+      ),
+      JourneyEvent(
+        title: "Wandering Merchant",
+        description: "A hooded figure offers you a suspicious vial.",
+        choices: [
+          EventChoice(label: "Buy (15 Coins)", onChosen: () {
+            if (gs.profile.coins >= 15) {
+              gs.addCoins(-15);
+              gs.addXp(50);
+              OverlayService.showToast("Gained 50 XP!");
+            } else {
+              OverlayService.showToast("Not enough coins.");
+            }
+            _clearEvent();
+          }),
+          EventChoice(label: "Ignore", onChosen: () {
+            _clearEvent();
+          }),
+        ]
+      )
+    ];
+    setState(() {
+      _currentEvent = events[_rnd.nextInt(events.length)];
+      _combatRepaint.value++;
+    });
+  }
+
+  void _clearEvent() {
+    setState(() {
+      _currentEvent = null;
+      _combatRepaint.value++;
+    });
+  }
+
+  Widget _buildEventPanel(JourneyEvent event) {
+    return Column(
+      key: ValueKey('event_${event.title}'),
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 12),
+        Panel(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                event.title,
+                style: const TextStyle(
+                  color: Colors.amberAccent,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                event.description,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70, fontSize: 16),
+              ),
+              const SizedBox(height: 24),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: event.choices.map((c) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: FilledButton.tonal(
+                    onPressed: c.onChosen,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white12,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: Text(c.label),
+                  ),
+                )).toList(),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -2111,9 +2218,11 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage>
                                 },
                                 child:
                                     m == null
-                                        ? const SizedBox.shrink(
-                                          key: ValueKey('no_monster'),
-                                        )
+                                        ? (_currentEvent != null
+                                            ? _buildEventPanel(_currentEvent!)
+                                            : const SizedBox.shrink(
+                                              key: ValueKey('no_monster'),
+                                            ))
                                         : Column(
                                           key: ValueKey(
                                             'monster_${m.name}_${m.hp}',

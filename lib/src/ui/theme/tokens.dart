@@ -24,7 +24,7 @@ class AppTokens {
   static const int colorUncommon = 0xFF4CAF50; // Green
   static const int colorRare = 0xFF2196F3; // Blue
   static const int colorLegendary = 0xFFFF9800; // Orange
-  static const int colorMystic = 0xFF9C27B0; // Purple
+  static const int colorMythic = 0xFF9C27B0; // Purple
   
   // Premium Effects
   static const double glowOpacity = 0.45;

@@ -75,7 +75,7 @@ int rarityColorValue(ItemRarity? r) {
       return 0xFF2196F3; // blue
     case ItemRarity.legendary:
       return 0xFFFFD700; // gold
-    case ItemRarity.mystic:
+    case ItemRarity.mythic:
       return 0xFFF44336; // red accent
     case ItemRarity.normal:
     default:

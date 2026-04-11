@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/models/pet.dart';
+import '../../data/models/item_display_helpers.dart';
 import '../../state/game_state.dart';
 import '../widgets/panel.dart';
 
@@ -11,7 +12,7 @@ class PetTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final gs = context.watch<GameState>();
-    final pets = Pet.starterPets();
+    final pets = Pet.allPets();
     final selectedId = gs.profile.selectedPetId;
     final scheme = Theme.of(context).colorScheme;
 
@@ -100,6 +101,7 @@ class _PetSelectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final traits = _getPetTraits(pet);
+    final rarityColor = Color(rarityColorValue(pet.rarity));
 
     return AnimatedScale(
       scale: isSelected ? 1.02 : 1.0,
@@ -109,9 +111,13 @@ class _PetSelectionCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? rarityColor : rarityColor.withValues(alpha: 0.3),
+              width: isSelected ? 2 : 1,
+            ),
             boxShadow: isSelected ? [
               BoxShadow(
-                color: scheme.primary.withValues(alpha: 0.2),
+                color: rarityColor.withValues(alpha: 0.2),
                 blurRadius: 16,
                 spreadRadius: 2,
               )
@@ -135,11 +141,24 @@ class _PetSelectionCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w900,
-                            color: isSelected ? scheme.primary : const Color(0xFF191C1B),
+                              color: isSelected ? rarityColor : const Color(0xFF191C1B),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: rarityColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: rarityColor.withValues(alpha: 0.3)),
+                            ),
+                            child: Text(
+                              pet.rarity.name.toUpperCase(),
+                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: rarityColor),
                             ),
                           ),
                           if (isSelected) ...[
-                            const SizedBox(width: 8),
+                            const Spacer(),
                             const Icon(Icons.verified_rounded, size: 16, color: Color(0xFF00897B)),
                           ],
                         ],
@@ -184,6 +203,7 @@ class _PetSelectionCard extends StatelessWidget {
     if (pet.accuracyBonus > 0) list.add(_PetTrait('ACC +${(pet.accuracyBonus * 100).round()}%', Colors.tealAccent, Icons.center_focus_strong_rounded));
     if (pet.evasionBonus > 0) list.add(_PetTrait('EVA +${(pet.evasionBonus * 100).round()}%', Colors.indigoAccent, Icons.waves_rounded));
     if (pet.critChanceBonus > 0) list.add(_PetTrait('CRT ${(pet.critChanceBonus * 100).round()}%', Colors.redAccent, Icons.star_rounded));
+    if (pet.critDamageBonus > 0) list.add(_PetTrait('CDMG +${(pet.critDamageBonus * 100).round()}%', Colors.purpleAccent, Icons.auto_awesome_rounded));
     return list;
   }
 }
