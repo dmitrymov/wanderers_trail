@@ -45,6 +45,7 @@ class PlayerProfile {
   final List<String> unlockedClassIds;
   final List<Item> relics;
   final int? savedStep; // last saved run step for Continue
+  final int? savedLevel; // last saved run level for Continue
   final bool hasEquipmentBeenSeparated; // One-time migration flag
 
   const PlayerProfile({
@@ -82,6 +83,7 @@ class PlayerProfile {
     required this.unlockedClassIds,
     this.relics = const [],
     this.savedStep,
+    this.savedLevel,
     required this.hasEquipmentBeenSeparated,
   });
 
@@ -122,6 +124,7 @@ class PlayerProfile {
     List<String>? unlockedClassIds,
     List<Item>? relics,
     Object? savedStep = _unset,
+    Object? savedLevel = _unset,
     bool? hasEquipmentBeenSeparated,
   }) => PlayerProfile(
         userId: userId ?? this.userId,
@@ -158,6 +161,7 @@ class PlayerProfile {
         unlockedClassIds: unlockedClassIds ?? this.unlockedClassIds,
         relics: relics ?? this.relics,
         savedStep: identical(savedStep, _unset) ? this.savedStep : savedStep as int?,
+        savedLevel: identical(savedLevel, _unset) ? this.savedLevel : savedLevel as int?,
         hasEquipmentBeenSeparated: hasEquipmentBeenSeparated ?? this.hasEquipmentBeenSeparated,
       );
 
@@ -196,6 +200,7 @@ class PlayerProfile {
         'unlockedClassIds': unlockedClassIds,
         'relics': relics.map((r) => r.toJson()).toList(),
         'savedStep': savedStep,
+        'savedLevel': savedLevel,
         'hasEquipmentBeenSeparated': hasEquipmentBeenSeparated,
       };
 
@@ -236,6 +241,7 @@ class PlayerProfile {
         unlockedClassIds: (json['unlockedClassIds'] as List<dynamic>?)?.cast<String>() ?? ['survivor'],
         relics: (json['relics'] as List<dynamic>?)?.map((r) => Item.fromJson(r as Map<String, dynamic>)).toList() ?? [],
         savedStep: (json['savedStep'] as num?)?.toInt(),
+        savedLevel: (json['savedLevel'] as num?)?.toInt(),
         hasEquipmentBeenSeparated: json['hasEquipmentBeenSeparated'] as bool? ?? false,
       );
 
@@ -265,6 +271,7 @@ class PlayerProfile {
         unlockedClassIds: const ['survivor'],
         relics: const [],
         savedStep: null,
+        savedLevel: null,
         hasEquipmentBeenSeparated: true, // New profiles don't need reset
       );
 

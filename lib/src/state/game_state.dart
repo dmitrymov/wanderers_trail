@@ -408,6 +408,7 @@ class GameState extends ChangeNotifier {
       journeyRing: null,
       journeyBoots: null,
       savedStep: null,
+      savedLevel: null,
       coins: 0,
     );
     // If endless mode acts like the old "classic" mode, we might want to preserve 
@@ -432,13 +433,14 @@ class GameState extends ChangeNotifier {
       speedUpgrades: 0,
       speedMultiplier: profile.speedMultiplier.clamp(0.1, 1.0 + profile.permSpeedLevel * permSpeedStep),
       savedStep: null,
+      savedLevel: null,
     );
     notifyListeners();
     _persist();
   }
 
-  void saveRunProgress(int step) {
-    _profile = profile.copyWith(savedStep: step);
+  void saveRunProgress(int step, {int? level}) {
+    _profile = profile.copyWith(savedStep: step, savedLevel: level);
     notifyListeners();
     _persist();
   }
@@ -514,10 +516,11 @@ class GameState extends ChangeNotifier {
   }
 
   // End journey: save progress if needed and clear temporary items.
-  void endJourney({int? saveStep}) {
+  void endJourney({int? saveStep, int? saveLevel}) {
     // Save current progress
     _profile = profile.copyWith(
       savedStep: saveStep ?? profile.savedStep,
+      savedLevel: saveLevel ?? profile.savedLevel,
       journeyWeapon: null,
       journeyArmor: null,
       journeyRing: null,

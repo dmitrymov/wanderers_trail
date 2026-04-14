@@ -25,14 +25,13 @@ class JourneyTab extends StatefulWidget {
 }
 
 class _JourneyTabState extends State<JourneyTab> {
-  bool _isEndless = false;
 
-  void _startLevel(GameState gs, int levelId) {
-    gs.setIsEndlessMode(_isEndless);
+  void _startLevel(GameState gs, int? levelId) {
+    gs.setIsEndlessMode(levelId == null);
     gs.resetForNewRun();
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ActiveJourneyPage(initialStep: 0, level: _isEndless ? null : levelId),
+        builder: (_) => ActiveJourneyPage(initialStep: 0, level: levelId),
       ),
     );
   }
@@ -49,9 +48,11 @@ class _JourneyTabState extends State<JourneyTab> {
 
   void _continueRun(GameState gs) {
     final step = gs.profile.savedStep ?? 0;
+    final level = gs.profile.savedLevel;
+    gs.setIsEndlessMode(level == null);
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ActiveJourneyPage(initialStep: step),
+        builder: (_) => ActiveJourneyPage(initialStep: step, level: level),
       ),
     );
   }
@@ -179,53 +180,6 @@ class _JourneyTabState extends State<JourneyTab> {
                 ),
                 const SizedBox(height: AppTokens.gap32),
 
-                // Action Section (Levels & Continue)
-                if (canContinue)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16.0),
-                    child: SizedBox(
-                      width: 400,
-                      height: 64,
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppTokens.r12 * 1.5),
-                          ),
-                          elevation: 8,
-                          backgroundColor: scheme.primary,
-                        ),
-                        onPressed: () => _continueRun(gs),
-                        icon: const Icon(Icons.play_arrow_rounded, size: 28),
-                        label: Text(
-                          'Continue Journey (Step ${gs.profile.savedStep})',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                if (resumeStep >= 50 && !canContinue)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16.0),
-                    child: SizedBox(
-                      width: 400,
-                      height: 56,
-                      child: FilledButton.tonalIcon(
-                        onPressed: () => _resumeCheckpoint(gs, resumeStep),
-                        icon: const Icon(Icons.restore),
-                        label: Text('Resume from Checkpoint (Step $resumeStep)'),
-                      ),
-                    ),
-                  ),
-                  
-                SwitchListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                  title: const Text('Endless Mode', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('Classic randomized infinite loop with gifts.'),
-                  value: _isEndless,
-                  onChanged: (val) => setState(() => _isEndless = val),
-                  controlAffinity: ListTileControlAffinity.leading,
-                ),
                 
                 const SizedBox(height: 16),
                 
@@ -257,16 +211,76 @@ class _JourneyTabState extends State<JourneyTab> {
                         return Padding(
                           padding: const EdgeInsets.only(right: 16),
                           child: _LevelCard(
-                            level: level,
-                            isUnlocked: isUnlocked,
-                            isEndless: _isEndless,
-                            onTap: isUnlocked ? () => _startLevel(gs, level.levelId) : null,
+                             level: level,
+                             isUnlocked: isUnlocked,
+                             onTap: isUnlocked ? () => _startLevel(gs, level.levelId) : null,
                           ),
                         );
                       },
                     );
                   }),
                 ),
+
+                const SizedBox(height: 32),
+
+                // Endless Mode & Continue Buttons
+                SizedBox(
+                  width: 400,
+                  height: 56,
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => _startLevel(gs, null),
+                    icon: const Icon(Icons.all_inclusive_rounded),
+                    label: const Text(
+                      'Start Endless Mode',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+
+                if (canContinue) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: 400,
+                    height: 64,
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppTokens.r12 * 1.5),
+                        ),
+                        elevation: 8,
+                        backgroundColor: scheme.primary,
+                      ),
+                      onPressed: () => _continueRun(gs),
+                      icon: const Icon(Icons.play_arrow_rounded, size: 28),
+                      label: Text(
+                        () {
+                          final lId = gs.profile.savedLevel;
+                          final step = gs.profile.savedStep;
+                          if (lId == null) return 'Continue Endless (Step $step)';
+                          final lName = JourneyLevelConfig.getLevel(lId).name;
+                          return 'Continue $lName (Step $step)';
+                        }(),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+
+                if (resumeStep >= 50 && !canContinue) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: 400,
+                    height: 56,
+                    child: FilledButton.tonalIcon(
+                      onPressed: () => _resumeCheckpoint(gs, resumeStep),
+                      icon: const Icon(Icons.restore),
+                      label: Text('Resume from Checkpoint (Step $resumeStep)'),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -279,13 +293,11 @@ class _JourneyTabState extends State<JourneyTab> {
 class _LevelCard extends StatelessWidget {
   final JourneyLevelConfig level;
   final bool isUnlocked;
-  final bool isEndless;
   final VoidCallback? onTap;
 
   const _LevelCard({
     required this.level,
     required this.isUnlocked,
-    required this.isEndless,
     this.onTap,
   });
 
@@ -516,7 +528,7 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage>
           ),
     );
     if (confirm == true) {
-      gs2.endJourney(saveStep: _step);
+      gs2.endJourney(saveStep: _step, saveLevel: widget.level);
       gs2.setCombatActive(false);
       _stopCombat();
       if (mounted) {
@@ -908,7 +920,7 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage>
     // Update best step and autosave/checkpoint
     gs.updateHighScore(_step);
     if (_step % 5 == 0) {
-      gs.saveRunProgress(_step);
+      gs.saveRunProgress(_step, level: widget.level);
     }
     if (_step % 50 == 0) {
       OverlayService.showToast('Checkpoint reached: Step $_step');
